@@ -91,4 +91,5 @@ if __name__ == "__main__":
         args.base_path_to_store_results,
         args.entity_name,
         args.log_to_wandb,
+        args.seed,
     )
