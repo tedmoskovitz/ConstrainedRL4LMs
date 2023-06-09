@@ -17,6 +17,7 @@ def main(
     base_path_to_store_results: str,
     entity_name: str,
     log_to_wandb: bool,
+    seed: int,
 ):
 
     # load the config file
@@ -51,6 +52,7 @@ def main(
             on_policy_alg_config=config["alg"],
             train_eval_config=config["train_evaluation"],
             tracker=tracker,
+            seed=seed,
         )
     trainer.train_and_eval()
 
@@ -79,6 +81,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--log_to_wandb", action="store_true", help="Whether to use wandb logging"
     )
+    parser.add_argument("--seed", type=int, help="Random seed", default=0)
     args = parser.parse_args()
 
     main(

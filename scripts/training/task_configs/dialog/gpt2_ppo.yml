@@ -49,7 +49,7 @@ alg:
       
 train_evaluation:
   eval_batch_size: 32
-  n_iters: 50
+  n_iters: 100
   eval_every: 5
   save_every: 10
   metrics:

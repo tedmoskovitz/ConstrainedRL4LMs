@@ -1,6 +1,8 @@
 from functools import partial
 from typing import Any, Dict, List
 import numpy as np
+import torch
+import random
 
 from rl4lms.data_pools.text_generation_pool import Sample
 from rl4lms.envs.text_generation.env import TextGenEnv
@@ -30,6 +32,13 @@ from rl4lms.envs.text_generation.utils_supervised import (get_datasets_for_causa
                                                            EvalCallack)
 from rl4lms.envs.text_generation.warm_start import TrainerWarmStartMixin
 
+
+def set_seed_everywhere(seed):
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    random.seed(seed)
 
 def build_tokenizer(tokenizer_config: Dict[str, Any]):
     tokenizer = AutoTokenizer.from_pretrained(
@@ -136,7 +145,8 @@ class OnPolicyTrainer(TrainerWarmStartMixin):
                  on_policy_alg_config: Dict[str, Any],
                  train_eval_config: Dict[str, Any],
                  tracker: Tracker = None,
-                 experiment_name: str = ''
+                 experiment_name: str = '',
+                 seed: int = 0
                  ):
         self._tokenizer_config = tokenizer_config
         self._datapool_config = datapool_config
@@ -146,11 +156,14 @@ class OnPolicyTrainer(TrainerWarmStartMixin):
         self._train_eval_config = train_eval_config
         self._tracker = tracker
         self._experiment_name = experiment_name
+        self._seed = seed
         self._setup()
 
     def _setup(self):
         # load trainer state from available previous checkpoint if available
         self.load_trainer_state(self._tracker)
+        # set random seed
+        set_seed_everywhere(self._seed)
 
         # build components
         self._tokenizer = build_tokenizer(self._tokenizer_config)
