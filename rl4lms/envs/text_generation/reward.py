@@ -615,6 +615,7 @@ class IntentAccuracy(BatchedRewardFunction):
         self._intent_coeff = intent_coeff
         self._auto_coeff = auto_coeff
         self._shaping_metric = MeteorMetric()
+        self.component_rewards = dict(meteor=None, intent=None, done_ixs=None)
 
     def __call__(
         self,
@@ -655,7 +656,10 @@ class IntentAccuracy(BatchedRewardFunction):
         scores = self._metric.compute(
             done_prompt_texts, done_gen_texts, done_ref_texts, done_meta_infos
         )["intent/accuracy"][0]
+        meteor_rewards = rewards.copy()
         rewards[done_ixs] += self._intent_coeff * np.array(scores)
+        self.component_rewards = dict(
+            meteor=meteor_rewards, intent=np.array(scores), done_ixs=done_ixs)
         return rewards.tolist()
 
 

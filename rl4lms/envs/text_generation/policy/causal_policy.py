@@ -1,5 +1,6 @@
 from copy import deepcopy
 from typing import Any, Dict, List, Optional, Union
+import pdb
 
 import torch
 from gym.spaces import Discrete
@@ -255,12 +256,15 @@ class CausalLMActorCriticPolicy(LMActorCriticPolicy, ActorCriticWarmStartMixin):
         return ref_policy_outputs
 
     def get_policy_first_device(self):
-        return (
-            self._policy_model.transformer.first_device
-            if self._apply_model_parallel
-            and unwrap_model(self._policy_model).is_parallelizable
-            else "cuda"
-        )
+        try:
+            return (
+                self._policy_model.transformer.first_device
+                if self._apply_model_parallel
+                and unwrap_model(self._policy_model).is_parallelizable
+                else self.device  # "cuda"
+            )
+        except:
+            return self.device
 
     def get_inputs_for_generation(self, obs: TensorDict):
         gen_inputs = GenerationInputs(

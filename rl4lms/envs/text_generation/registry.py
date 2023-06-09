@@ -6,6 +6,7 @@ from stable_baselines3.common.on_policy_algorithm import OnPolicyAlgorithm
 from rl4lms.algorithms.a2c.a2c import A2C
 from rl4lms.algorithms.nlpo import NLPO
 from rl4lms.algorithms.ppo.ppo import PPO
+from rl4lms.algorithms.constrained_ppo.constrained_ppo import ConstrainedPPO
 from rl4lms.algorithms.trpo import TRPO
 from rl4lms.data_pools.custom_text_generation_pools import (
     IMDB,
@@ -205,6 +206,7 @@ class AlgorithmRegistry:
         "nlpo": NLPO,
         "trpo": TRPO,
         "ppo": PPO,
+        "constrained_ppo": ConstrainedPPO,
         "a2c": A2C,
     }
 
@@ -230,6 +232,7 @@ class WrapperRegistry:
         "nlpo": wrap_onpolicy_alg,
         "trpo": wrap_onpolicy_alg,
         "ppo": wrap_onpolicy_alg,
+        "constrained_ppo": wrap_onpolicy_alg,
         "a2c": wrap_onpolicy_alg,
     }
 
