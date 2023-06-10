@@ -443,10 +443,10 @@ class ConstrainedPPO(OnPolicyAlgorithm):
         eval_env: Optional[GymEnv] = None,
         eval_freq: int = -1,
         n_eval_episodes: int = 5,
-        tb_log_name: str = "PPO",
+        tb_log_name: str = "ConstrainedPPO",
         eval_log_path: Optional[str] = None,
         reset_num_timesteps: bool = True,
-    ) -> "PPO":
+    ) -> "ConstrainedPPO":
 
         return super().learn(
             total_timesteps=total_timesteps,
