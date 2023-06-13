@@ -18,6 +18,7 @@ def main(
     entity_name: str,
     log_to_wandb: bool,
     seed: int,
+    disable_multiprocess: bool = False,
 ):
 
     # load the config file
@@ -52,6 +53,7 @@ def main(
             on_policy_alg_config=config["alg"],
             train_eval_config=config["train_evaluation"],
             tracker=tracker,
+            disable_multiprocess=disable_multiprocess,
             seed=seed,
         )
     trainer.train_and_eval()
@@ -82,6 +84,8 @@ if __name__ == "__main__":
         "--log_to_wandb", action="store_true", help="Whether to use wandb logging"
     )
     parser.add_argument("--seed", type=int, help="Random seed", default=0)
+    parser.add_argument("--disable_multiprocess", action="store_true",
+                        help="Whether to disable multiprocessing")
     args = parser.parse_args()
 
     main(
@@ -92,4 +96,5 @@ if __name__ == "__main__":
         args.entity_name,
         args.log_to_wandb,
         args.seed,
+        disable_multiprocess=args.disable_multiprocess,
     )

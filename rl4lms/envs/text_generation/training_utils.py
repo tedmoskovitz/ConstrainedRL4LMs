@@ -88,7 +88,8 @@ def build_datapool(datapool_config: Dict[str, Any]):
 def build_env(env_config: Dict[str, Any],
               reward_fn: RewardFunction,
               tokenizer: AutoTokenizer,
-              train_samples: List[Sample]):
+              train_samples: List[Sample],
+              multiprocess: bool = True,):
     # vectoried env
     env_kwargs = {
         "reward_function": reward_fn,
@@ -99,7 +100,7 @@ def build_env(env_config: Dict[str, Any],
     env = make_vec_env(TextGenEnv,
                        n_envs=env_config.get(
                            "n_envs", 1),
-                       vec_env_cls=SubprocVecEnv,
+                       vec_env_cls=SubprocVecEnv if multiprocess else None,
                        env_kwargs=env_kwargs)
     return env
 
@@ -146,6 +147,7 @@ class OnPolicyTrainer(TrainerWarmStartMixin):
                  train_eval_config: Dict[str, Any],
                  tracker: Tracker = None,
                  experiment_name: str = '',
+                 disable_multiprocess: bool = False,
                  seed: int = 0
                  ):
         self._tokenizer_config = tokenizer_config
@@ -157,6 +159,7 @@ class OnPolicyTrainer(TrainerWarmStartMixin):
         self._tracker = tracker
         self._experiment_name = experiment_name
         self._seed = seed
+        self._disable_multiprocess = disable_multiprocess
         self._setup()
 
     def _setup(self):
@@ -173,7 +176,8 @@ class OnPolicyTrainer(TrainerWarmStartMixin):
         self._samples_by_split = build_datapool(
             self._datapool_config)
         self._env = build_env(self._env_config, self._reward_fn,
-                              self._tokenizer, self._samples_by_split["train"])
+                              self._tokenizer, self._samples_by_split["train"],
+                              multiprocess=not self._disable_multiprocess)
         self._alg = build_alg(self._on_policy_alg_config,
                               self._env, self._tracker,
                               self._policy_state_dict,
