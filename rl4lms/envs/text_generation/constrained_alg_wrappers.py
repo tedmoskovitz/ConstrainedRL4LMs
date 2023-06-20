@@ -303,7 +303,10 @@ def wrap_constrained_alg(
         ):
             # if the reward function is batchable, we override the rewards here
             if isinstance(self.reward_fn, BatchedRewardFunction):
-                compute_batched_rewards(episode_wise_transitions, self.reward_fn)
+                compute_batched_rewards(
+                    episode_wise_transitions,
+                    self.reward_fn,
+                    self.env.constraint_name)
 
             advantages_computed = False
             for ep_ix, transitions in enumerate(episode_wise_transitions):
