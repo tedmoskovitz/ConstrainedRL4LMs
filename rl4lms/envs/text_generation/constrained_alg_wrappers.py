@@ -159,8 +159,8 @@ def wrap_constrained_alg(
             obs_tensor = obs_as_tensor(current_obs, self.device)
             generation_inputs = self.policy.get_inputs_for_generation(obs_tensor)
             gen_output = self.policy.generate(
-                input_ids=generation_inputs.inputs,
-                attention_mask=generation_inputs.attention_masks,
+                input_ids=generation_inputs.inputs.long(),
+                attention_mask=generation_inputs.attention_masks.long(),
                 tokenizer=tokenizer,
             )
 
@@ -221,6 +221,8 @@ def wrap_constrained_alg(
                     )
 
                     # get reference log probs
+                    for k in obs_tensor:
+                        obs_tensor[k] = obs_tensor[k].long()
                     ref_policy_outputs: RefPolicyOutput = (
                         self.policy.get_log_probs_ref_model(
                             obs_tensor, actions_tensor, ref_past_state
