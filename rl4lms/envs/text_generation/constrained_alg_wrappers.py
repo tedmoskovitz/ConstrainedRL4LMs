@@ -57,7 +57,9 @@ def unpack_observations(obs_tensor, n_envs: int):
 
 
 def compute_batched_rewards(
-    episode_wise_transitions: List[List[ConstrainedTransitionInfo]], reward_fn: RewardFunction
+    episode_wise_transitions: List[List[ConstrainedTransitionInfo]],
+    reward_fn: RewardFunction,
+    constraint_name: str,
 ):
     # first collect all the prompts, ref and gen texts
     prompts = []
@@ -79,6 +81,10 @@ def compute_batched_rewards(
 
     # compute rewards all at once
     rewards = reward_fn(prompts, generated_texts, reference_texts, is_dones, meta_infos)
+    # TODO: verify reward_fn.component_rewards captures this
+    pdb.set_trace()
+    constraint_rewards = reward_fn.component_rewards[constraint_name]
+    all_rewards = zip(rewards, constraint_rewards)  # TODO: verify this works
     # rewards = rewards.numpy().flatten()
 
     # override the rewards in transitions
@@ -258,7 +264,6 @@ def wrap_constrained_alg(
                 for env_ix in range(self.env.num_envs):
                     # only if not terminated already
                     if not ep_terminated[env_ix]:
-                        pdb.set_trace()
                         transtion = ConstrainedTransitionInfo(
                             observation=unpacked_obs[env_ix],
                             action=actions[env_ix],
