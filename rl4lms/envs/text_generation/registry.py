@@ -24,6 +24,7 @@ from rl4lms.data_pools.custom_text_generation_pools import (
 )
 from rl4lms.data_pools.text_generation_pool import TextGenPool
 from rl4lms.envs.text_generation.alg_wrappers import wrap_onpolicy_alg
+from rl4lms.envs.text_generation.constrained_alg_wrappers import wrap_constrained_alg
 from rl4lms.envs.text_generation.metric import (
     BaseMetric,
     BERTScoreMetric,
@@ -232,7 +233,7 @@ class WrapperRegistry:
         "nlpo": wrap_onpolicy_alg,
         "trpo": wrap_onpolicy_alg,
         "ppo": wrap_onpolicy_alg,
-        "constrained_ppo": wrap_onpolicy_alg,
+        "constrained_ppo": wrap_constrained_alg,
         "a2c": wrap_onpolicy_alg,
     }
 

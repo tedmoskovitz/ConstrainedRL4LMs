@@ -1,11 +1,12 @@
 from functools import partial
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 import numpy as np
 import torch
 import random
 
 from rl4lms.data_pools.text_generation_pool import Sample
 from rl4lms.envs.text_generation.env import TextGenEnv
+from rl4lms.envs.text_generation.constrained_env import ConstrainedTextGenEnv
 from rl4lms.envs.text_generation.evaluation_utils import evaluate_on_samples
 from rl4lms.envs.text_generation.utils_supervised import evaluate_on_samples as evaluate_supervised
 from rl4lms.envs.text_generation.logging_utils import Tracker
@@ -96,10 +97,11 @@ def build_env(env_config: Dict[str, Any],
         "tokenizer": tokenizer,
         "samples": train_samples,
     }
-    env_kwargs = {**env_kwargs, **env_config.get("args", {})}
-    env = make_vec_env(TextGenEnv,
-                       n_envs=env_config.get(
-                           "n_envs", 1),
+    env_config_args = env_config.get("args", {})
+    env_kwargs = {**env_kwargs, **env_config_args}
+    env_cls = ConstrainedTextGenEnv if "constraint_name" in env_config_args else TextGenEnv
+    env = make_vec_env(env_cls,
+                       n_envs=env_config.get("n_envs", 1),
                        vec_env_cls=SubprocVecEnv if multiprocess else None,
                        env_kwargs=env_kwargs)
     return env
