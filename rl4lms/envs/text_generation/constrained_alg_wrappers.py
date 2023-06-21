@@ -425,6 +425,7 @@ def wrap_constrained_alg(
                 rollout_info = self.generate_batch(
                     rollout_buffer, tokenizer, max_steps, rollout_info
                 )
+            pdb.set_trace()
 
             # aggregate rollout info
             aggregated_rollout_info = {}
