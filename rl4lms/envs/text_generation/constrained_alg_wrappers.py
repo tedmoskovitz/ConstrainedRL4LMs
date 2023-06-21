@@ -12,7 +12,7 @@ from stable_baselines3.common.type_aliases import TensorDict
 from stable_baselines3.common.vec_env import VecEnv
 from transformers import PreTrainedTokenizer
 
-from rl4lms.algorithms.common.buffers import ConstrainedDictRolloutBuffer, ConstrainedRolloutBuffer
+from rl4lms.algorithms.common.constrained_buffers import ConstrainedDictRolloutBuffer, ConstrainedRolloutBuffer
 from rl4lms.algorithms.common.maskable.constrained_maskable_buffers import MaskableConstrainedDictRolloutBuffer
 from rl4lms.envs.text_generation.kl_controllers import KLController
 from rl4lms.envs.text_generation.logging_utils import Tracker
