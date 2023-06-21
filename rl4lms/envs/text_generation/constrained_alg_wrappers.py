@@ -1,10 +1,10 @@
 from dataclasses import dataclass
 from typing import Any, Dict, List, Tuple, Type
 
+from copy import deepcopy
 import numpy as np
 import torch
 import pdb
-from stable_baselines3.common.buffers import DictRolloutBuffer, RolloutBuffer
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.on_policy_algorithm import OnPolicyAlgorithm
 from stable_baselines3.common.utils import obs_as_tensor
@@ -12,7 +12,8 @@ from stable_baselines3.common.type_aliases import TensorDict
 from stable_baselines3.common.vec_env import VecEnv
 from transformers import PreTrainedTokenizer
 
-from rl4lms.algorithms.common.maskable.buffers import MaskableDictRolloutBuffer
+from rl4lms.algorithms.common.buffers import ConstrainedDictRolloutBuffer, ConstrainedRolloutBuffer
+from rl4lms.algorithms.common.maskable.constrained_maskable_buffers import MaskableConstrainedDictRolloutBuffer
 from rl4lms.envs.text_generation.kl_controllers import KLController
 from rl4lms.envs.text_generation.logging_utils import Tracker
 from rl4lms.envs.text_generation.policy.base_policy import (
@@ -33,7 +34,8 @@ class ConstrainedTransitionInfo:
     total_reward: np.ndarray  # task_reward + kl_reward
     kl_div: np.ndarray
     episode_start: np.ndarray
-    value: torch.Tensor
+    task_value: torch.Tensor
+    constraint_value: torch.Tensor
     log_prob: torch.Tensor
     done: np.ndarray
     ref_log_prob: torch.Tensor
@@ -82,17 +84,17 @@ def compute_batched_rewards(
     # compute rewards all at once
     rewards = reward_fn(prompts, generated_texts, reference_texts, is_dones, meta_infos)
     # TODO: verify reward_fn.component_rewards captures this
-    pdb.set_trace()
-    constraint_rewards = reward_fn.component_rewards[constraint_name]
+    constraint_rewards = list(reward_fn.component_rewards[constraint_name])
     all_rewards = zip(rewards, constraint_rewards)  # TODO: verify this works
     # rewards = rewards.numpy().flatten()
 
     # override the rewards in transitions
-    for (env_ix, trans_ix), reward in zip(indices, rewards):
+    for (env_ix, trans_ix), (reward, constraint_reward) in zip(indices, all_rewards):
         episode_wise_transitions[env_ix][trans_ix].task_reward = reward
         episode_wise_transitions[env_ix][trans_ix].total_reward = (
             reward + episode_wise_transitions[env_ix][trans_ix].kl_reward
         )
+        episode_wise_transitions[env_ix][trans_ix].constraint_reward = constraint_reward
 
 
 def wrap_constrained_alg(
@@ -118,7 +120,7 @@ def wrap_constrained_alg(
             self.tracker = tracker
             self._norm_reward = norm_reward
             # flattened rollout buffer
-            self.rollout_buffer = MaskableDictRolloutBuffer(
+            self.rollout_buffer = MaskableConstrainedDictRolloutBuffer(
                 self.n_steps * self.env.num_envs,
                 self.observation_space,
                 self.action_space,
@@ -149,7 +151,7 @@ def wrap_constrained_alg(
 
         def generate_batch(
             self,
-            rollout_buffer: DictRolloutBuffer,
+            rollout_buffer: ConstrainedDictRolloutBuffer,
             tokenizer: PreTrainedTokenizer,
             max_steps: int,
             rollout_info: Dict[str, Any],
@@ -174,7 +176,8 @@ def wrap_constrained_alg(
             # process them one step at a time to collect rollout info
             episode_wise_transitions = [[] for _ in range(self.env.num_envs)]
             ep_terminated = np.zeros((self.env.num_envs,), dtype=bool)
-            value_past_state = None
+            task_value_past_state = None
+            constraint_value_past_state = None
             ref_past_state = None
             policy_past_state = None
             masks = (
@@ -219,13 +222,15 @@ def wrap_constrained_alg(
                     ), "Infinite values in log probs"
 
                     # get values
-                    value_outputs: ValueOutput = self.policy.forward_value(
-                        obs_tensor, value_past_state
+                    task_value_outputs: ValueOutput = self.policy.forward_value(
+                        obs_tensor, task_value_past_state
                     )
-                    values, value_past_state = (
-                        value_outputs.values,
-                        value_outputs.past_model_kwargs,
+                    constraint_value_outputs = deepcopy(task_value_outputs)
+                    task_values, task_value_past_state = (
+                       task_value_outputs.values,
+                       task_value_outputs.past_model_kwargs,
                     )
+                    constraint_values, constraint_value_past_state = deepcopy(task_value_outputs), deepcopy(constraint_value_outputs)
 
                     # get reference log probs
                     for k in obs_tensor:
@@ -273,7 +278,8 @@ def wrap_constrained_alg(
                             total_reward=total_rewards[env_ix],
                             kl_div=kl_div.cpu().numpy()[env_ix],
                             episode_start=episode_starts[env_ix],
-                            value=values[env_ix].cpu(),
+                            task_value=task_values[env_ix].cpu(),
+                            constraint_value=constraint_values[env_ix].cpu(),  # TODO: fix this once have real constraint values
                             log_prob=log_probs[env_ix].cpu(),
                             done=dones[env_ix],
                             ref_log_prob=ref_log_probs[env_ix].cpu(),
@@ -304,7 +310,6 @@ def wrap_constrained_alg(
         ):
             # if the reward function is batchable, we override the rewards here
             if isinstance(self.reward_fn, BatchedRewardFunction):
-                pdb.set_trace()
                 compute_batched_rewards(
                     episode_wise_transitions,
                     self.reward_fn,
@@ -313,25 +318,30 @@ def wrap_constrained_alg(
             advantages_computed = False
             for ep_ix, transitions in enumerate(episode_wise_transitions):
                 ep_length = len(transitions)
-                total_reward = 0.0
+                total_task_reward = 0.0
+                total_constraint_reward = 0.0
                 total_kl_reward = 0.0
                 for transition_ix, transition in enumerate(transitions):
-                    total_reward += transition.task_reward
+                    total_task_reward += transition.task_reward
+                    total_constraint_reward += transition.constraint_reward
                     total_kl_reward += transition.kl_reward
                     rollout_info["rollout_info/kl_div_mean"].append(transition.kl_div)
                     rollout_info["rollout_info/log_prob"].append(transition.log_prob)
                     rollout_info["rollout_info/ref_log_prob"].append(
                         transition.ref_log_prob
                     )
-                    rollout_info["rollout_info/values"].append(transition.value.numpy())
+                    rollout_info["rollout_info/task_values"].append(transition.task_value.numpy())
+                    rollout_info["rollout_info/constraint_values"].append(transition.constraint_value.numpy())
 
                     if not rollout_buffer.full:
                         rollout_buffer.add(
                             transition.observation,
                             transition.action,
                             transition.total_reward,
+                            transition.constraint_reward,
                             transition.episode_start,
-                            transition.value,
+                            transition.task_value,
+                            transition.constraint_value,
                             transition.log_prob,
                             action_masks=transition.action_mask,
                         )
@@ -341,26 +351,39 @@ def wrap_constrained_alg(
 
                         # normalize the rewards
                         if self._norm_reward:
-                            mean = rollout_buffer.rewards.mean()
-                            std = rollout_buffer.rewards.std()
-                            rollout_buffer.rewards = (rollout_buffer.rewards - mean) / (
+                            mean = rollout_buffer.task_rewards.mean()
+                            std = rollout_buffer.constraint_rewards.std()
+                            rollout_buffer.task_rewards = (rollout_buffer.task_rewards - mean) / (
+                                std + 1e-8
+                            )
+                            mean = rollout_buffer.constraint_rewards.mean()
+                            std = rollout_buffer.constraint_rewards.std()
+                            rollout_buffer.constraint_rewards = (rollout_buffer.constraint_rewards - mean) / (
                                 std + 1e-8
                             )
 
                         # we fetch the last value for the last time step
                         # values come from the next transitions's values
-                        next_values = (
-                            transitions[transition_ix + 1].value
+                        next_task_values = (
+                            transitions[transition_ix + 1].task_value
+                            if (transition_ix + 1) < ep_length
+                            else torch.tensor([0.0])
+                        )
+                        next_constraint_values = (
+                            transitions[transition_ix + 1].constraint_value
                             if (transition_ix + 1) < ep_length
                             else torch.tensor([0.0])
                         )
 
                         rollout_buffer.compute_returns_and_advantage(
-                            last_values=next_values, dones=transition.done
+                            last_task_values=next_task_values,
+                            last_constraint_values=next_constraint_values,
+                            dones=transition.done
                         )
                         advantages_computed = True
 
-                rollout_info["rollout_info/ep_rew"].append(total_reward)
+                rollout_info["rollout_info/ep_task_rew"].append(total_task_reward)
+                rollout_info["rollout_info/ep_constraint_rew"].append(total_constraint_reward)
                 rollout_info["rollout_info/ep_lens"].append(ep_length)
                 rollout_info["rollout_info/ep_kl_rew"].append(total_kl_reward)
             return rollout_info
@@ -369,7 +392,7 @@ def wrap_constrained_alg(
             self,
             env: VecEnv,
             callback: BaseCallback,
-            rollout_buffer: RolloutBuffer,
+            rollout_buffer: ConstrainedRolloutBuffer,
             n_rollout_steps: int,
         ) -> bool:
             # max episode steps
@@ -387,13 +410,15 @@ def wrap_constrained_alg(
 
             # start the rollout process
             rollout_info = {
-                "rollout_info/ep_rew": [],
+                "rollout_info/ep_task_rew": [],
+                "rollout_info/ep_constraint_rew": [],
                 "rollout_info/kl_div_mean": [],
                 "rollout_info/ep_lens": [],
                 "rollout_info/ep_kl_rew": [],
                 "rollout_info/log_prob": [],
                 "rollout_info/ref_log_prob": [],
-                "rollout_info/values": [],
+                "rollout_info/task_values": [],
+                "rollout_info/constraint_values": [],
             }
             while not rollout_buffer.full:
                 # generate batch of rollouts
