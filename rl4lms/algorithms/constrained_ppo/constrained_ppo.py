@@ -297,7 +297,7 @@ class ConstrainedPPO(OnPolicyAlgorithm):
 
         self._n_updates += self.n_epochs
         explained_var = explained_variance(
-            self.rollout_buffer.values.flatten(), self.rollout_buffer.returns.flatten())
+            self.rollout_buffer.task_values.flatten(), self.rollout_buffer.task_returns.flatten())
 
         # Logs
         self.logger.record("train/entropy_loss", np.mean(entropy_losses))
