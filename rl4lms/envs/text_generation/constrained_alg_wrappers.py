@@ -230,7 +230,7 @@ def wrap_constrained_alg(
                        task_value_outputs.values,
                        task_value_outputs.past_model_kwargs,
                     )
-                    constraint_values, constraint_value_past_state = deepcopy(task_value_outputs), deepcopy(constraint_value_outputs)
+                    constraint_values, constraint_value_past_state = deepcopy(task_values), deepcopy(task_value_past_state)
 
                     # get reference log probs
                     for k in obs_tensor:
