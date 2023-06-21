@@ -13,7 +13,7 @@ from gym import spaces
 # from stable_baselines3.common.buffers import DictRolloutBuffer, RolloutBuffer
 from stable_baselines3.common.type_aliases import TensorDict
 from stable_baselines3.common.vec_env import VecNormalize
-from rl4lms.algorithms.common.buffers import ConstrainedDictRolloutBuffer, ConstrainedRolloutBuffer
+from rl4lms.algorithms.common.constrained_buffers import ConstrainedDictRolloutBuffer, ConstrainedRolloutBuffer
 
 class MaskableConstrainedRolloutBufferSamples(NamedTuple):
     observations: th.Tensor
