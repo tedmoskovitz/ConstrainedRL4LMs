@@ -27,7 +27,7 @@ env:
 alg:
   id: constrained_ppo
   args: 
-    n_steps: 128
+    n_steps: 256
     batch_size: 64
     verbose: 1
     learning_rate: 0.000001
