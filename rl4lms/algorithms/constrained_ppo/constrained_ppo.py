@@ -106,6 +106,9 @@ class ConstrainedPPO(OnPolicyAlgorithm):
         seed: Optional[int] = None,
         device: Union[th.device, str] = "auto",
         _init_setup_model: bool = True,
+        constraint_threshold: float = 0.1,
+        sigmoid_lagrange: bool = True,
+        lagrange_lr: float = 1e-2,
     ):
 
         super().__init__(
@@ -167,6 +170,11 @@ class ConstrainedPPO(OnPolicyAlgorithm):
         self.normalize_advantage = normalize_advantage
         self.target_kl = target_kl
         self._tracker = tracker
+        self.constraint_threshold = constraint_threshold
+        self.sigmoid_lagrange = sigmoid_lagrange
+        self.lagrange = th.tensor([0.5], requires_grad=True).to(self.device)
+        self.lagrange_optimizer = th.optim.SGD([self.lagrange], lr=lagrange_lr, momentum=0.9)
+
 
         if _init_setup_model:
             self._setup_model()
@@ -199,6 +207,7 @@ class ConstrainedPPO(OnPolicyAlgorithm):
 
         entropy_losses = []
         pg_losses, task_value_losses, constraint_value_losses = [], [], []
+        lagrange_losses = []
         clip_fractions = []
 
         continue_training = True
@@ -225,17 +234,23 @@ class ConstrainedPPO(OnPolicyAlgorithm):
                 constraint_values = values[..., 1].flatten()
                 # values = values.flatten()
                 # Normalize advantage
-                advantages = rollout_data.task_advantages
+                task_advantages = rollout_data.task_advantages
+                constraint_advantages = rollout_data.constraint_advantages
                 if self.normalize_advantage:
-                    advantages = (advantages - advantages.mean()
-                                  ) / (advantages.std() + 1e-8)
+                    task_advantages = (task_advantages - task_advantages.mean()
+                                  ) / (task_advantages.std() + 1e-8)
+                    constraint_advantages = (constraint_advantages - constraint_advantages.mean()
+                                    ) / (constraint_advantages.std() + 1e-8)
+                    
+                # compute mixed advantages
+                mixed_advantages = task_advantages - self.lagrange * constraint_advantages
 
                 # ratio between old and new policy, should be one at the first iteration
                 ratio = th.exp(log_prob - rollout_data.old_log_prob)
 
                 # clipped surrogate loss
-                policy_loss_1 = advantages * ratio
-                policy_loss_2 = advantages * \
+                policy_loss_1 = mixed_advantages * ratio
+                policy_loss_2 = mixed_advantages * \
                     th.clamp(ratio, 1 - clip_range, 1 + clip_range)
                 policy_loss = -th.min(policy_loss_1, policy_loss_2).mean()
 
@@ -276,6 +291,11 @@ class ConstrainedPPO(OnPolicyAlgorithm):
 
                 loss = policy_loss + self.ent_coef * entropy_loss + self.vf_coef * value_loss
 
+                # compute lagrange multiplier loss  # TODO: see if it works better with 
+                # constraint returns instead of value estimates
+                lagrange_loss = self.lagrange * (self.constraint_threshold - rollout_data.constraint_returns).mean()
+                lagrange_losses.append(lagrange_loss.item())
+
                 # Calculate approximate form of reverse KL Divergence for early stopping
                 # see issue #417: https://github.com/DLR-RM/stable-baselines3/issues/417
                 # and discussion in PR #419: https://github.com/DLR-RM/stable-baselines3/pull/419
@@ -301,6 +321,13 @@ class ConstrainedPPO(OnPolicyAlgorithm):
                     self.policy.parameters(), self.max_grad_norm)
                 self.policy.optimizer.step()
 
+                # Lagrange multiplier update
+                self.lagrange_optimizer.zero_grad()
+                lagrange_loss.backward()
+                th.nn.utils.clip_grad_norm_(
+                    [self.lagrange], self.max_grad_norm)
+                self.lagrange_optimizer.step()
+
             if not continue_training:
                 break
 
@@ -320,6 +347,8 @@ class ConstrainedPPO(OnPolicyAlgorithm):
         self.logger.record("train/loss", loss.item())
         self.logger.record("train/task_explained_variance", task_explained_var)
         self.logger.record("train/constraint_explained_variance", constraint_explained_var)
+        self.logger.record("train/lagrange", self.lagrange.item())
+        self.logger.record("train/lagrange_loss", np.mean(lagrange_losses))
         if hasattr(self.policy, "log_std"):
             self.logger.record(
                 "train/std", th.exp(self.policy.log_std).mean().item())
