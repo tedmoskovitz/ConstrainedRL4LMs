@@ -322,6 +322,7 @@ class ConstrainedPPO(OnPolicyAlgorithm):
                 self.policy.optimizer.step()
 
                 # Lagrange multiplier update
+                pdb.set_trace()
                 self.lagrange_optimizer.zero_grad()
                 lagrange_loss.backward()
                 th.nn.utils.clip_grad_norm_(
