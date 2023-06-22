@@ -198,7 +198,7 @@ class ConstrainedPPO(OnPolicyAlgorithm):
                 self._current_progress_remaining)
 
         entropy_losses = []
-        pg_losses, value_losses = [], []
+        pg_losses, task_value_losses, constraint_value_losses = [], [], []
         clip_fractions = []
 
         continue_training = True
@@ -221,7 +221,9 @@ class ConstrainedPPO(OnPolicyAlgorithm):
                 evaluation_output: EvaluateActionsOutput = self.policy.evaluate_actions(
                     rollout_data.observations, actions)
                 values, log_prob, entropy = evaluation_output.values, evaluation_output.log_prob, evaluation_output.entropy
-                values = values.flatten()
+                task_values = values[..., 0].flatten()
+                constraint_values = values[..., 1].flatten()
+                # values = values.flatten()
                 # Normalize advantage
                 advantages = rollout_data.task_advantages
                 if self.normalize_advantage:
@@ -245,16 +247,23 @@ class ConstrainedPPO(OnPolicyAlgorithm):
 
                 if self.clip_range_vf is None:
                     # No clipping
-                    values_pred = values
+                    task_values_pred = task_values
+                    constraint_values_pred = constraint_values
                 else:
                     # Clip the different between old and new value
                     # NOTE: this depends on the reward scaling
-                    values_pred = rollout_data.old_task_values + th.clamp(
-                        values - rollout_data.old_task_values, -clip_range_vf, clip_range_vf
+                    task_values_pred = rollout_data.old_task_values + th.clamp(
+                        task_values - rollout_data.old_task_values, -clip_range_vf, clip_range_vf
+                    )
+                    constraint_values_pred = rollout_data.old_constraint_values + th.clamp(
+                        constraint_values - rollout_data.old_constraint_values, -clip_range_vf, clip_range_vf
                     )
                 # Value loss using the TD(gae_lambda) target
-                value_loss = F.mse_loss(rollout_data.task_returns, values_pred)
-                value_losses.append(value_loss.item())
+                task_value_loss = F.mse_loss(rollout_data.task_returns, task_values_pred)
+                task_value_losses.append(task_value_loss.item())
+                constraint_value_loss = F.mse_loss(rollout_data.constraint_returns, constraint_values_pred)
+                constraint_value_losses.append(constraint_value_loss.item())
+                value_loss = task_value_loss + constraint_value_loss
 
                 # Entropy loss favor exploration
                 if entropy is None:
@@ -296,17 +305,21 @@ class ConstrainedPPO(OnPolicyAlgorithm):
                 break
 
         self._n_updates += self.n_epochs
-        explained_var = explained_variance(
+        task_explained_var = explained_variance(
             self.rollout_buffer.task_values.flatten(), self.rollout_buffer.task_returns.flatten())
+        constraint_explained_var = explained_variance(
+            self.rollout_buffer.constraint_values.flatten(), self.rollout_buffer.constraint_returns.flatten())
 
         # Logs
         self.logger.record("train/entropy_loss", np.mean(entropy_losses))
         self.logger.record("train/policy_gradient_loss", np.mean(pg_losses))
-        self.logger.record("train/task_value_loss", np.mean(value_losses))
+        self.logger.record("train/task_value_loss", np.mean(task_value_losses))
+        self.logger.record("train/constraint_value_loss", np.mean(constraint_value_losses))
         self.logger.record("train/approx_kl", np.mean(approx_kl_divs))
         self.logger.record("train/clip_fraction", np.mean(clip_fractions))
         self.logger.record("train/loss", loss.item())
-        self.logger.record("train/explained_variance", explained_var)
+        self.logger.record("train/task_explained_variance", task_explained_var)
+        self.logger.record("train/constraint_explained_variance", constraint_explained_var)
         if hasattr(self.policy, "log_std"):
             self.logger.record(
                 "train/std", th.exp(self.policy.log_std).mean().item())
@@ -318,115 +331,16 @@ class ConstrainedPPO(OnPolicyAlgorithm):
             self.logger.record("train/clip_range_vf", clip_range_vf)
 
         train_info = {
-            "ppo/entropy_loss":  np.mean(entropy_losses).item(),
-            "ppo/policy_gradient_loss": np.mean(pg_losses).item(),
-            "ppo/value_loss": np.mean(value_losses).item(),
-            "ppo/approx_kl": np.mean(approx_kl_divs).item(),
-            "ppo/explained_variance": explained_var
+            "cppo/entropy_loss":  np.mean(entropy_losses).item(),
+            "cppo/policy_gradient_loss": np.mean(pg_losses).item(),
+            "cppo/task_value_loss": np.mean(task_value_losses).item(),
+            "cppo/constraint_value_loss": np.mean(constraint_value_losses).item(),
+            "cppo/approx_kl": np.mean(approx_kl_divs).item(),
+            "cppo/task_explained_variance": task_explained_var,
+            "cppo/constraint_explained_variance": constraint_explained_var,
         }
 
         self._tracker.log_training_infos(train_info)
-
-
-    # def collect_rollouts(
-    #     self,
-    #     env: VecEnv,
-    #     callback: BaseCallback,
-    #     rollout_buffer: RolloutBuffer,
-    #     n_rollout_steps: int,
-    # ) -> bool:
-    #     """
-    #     Collect experiences using the current policy and fill a ``RolloutBuffer``.
-    #     The term rollout here refers to the model-free notion and should not
-    #     be used with the concept of rollout used in model-based RL or planning.
-
-    #     :param env: The training environment
-    #     :param callback: Callback that will be called at each step
-    #         (and at the beginning and end of the rollout)
-    #     :param rollout_buffer: Buffer to fill with rollouts
-    #     :param n_rollout_steps: Number of experiences to collect per environment
-    #     :return: True if function returned with at least `n_rollout_steps`
-    #         collected, False if callback terminated rollout prematurely.
-    #     """
-    #     assert self._last_obs is not None, "No previous observation was provided"
-    #     # Switch to eval mode (this affects batch norm / dropout)
-    #     self.policy.set_training_mode(False)
-
-    #     n_steps = 0
-    #     rollout_buffer.reset()
-    #     # Sample new weights for the state dependent exploration
-    #     if self.use_sde:
-    #         self.policy.reset_noise(env.num_envs)
-
-    #     callback.on_rollout_start()
-
-    #     while n_steps < n_rollout_steps:
-    #         if self.use_sde and self.sde_sample_freq > 0 and n_steps % self.sde_sample_freq == 0:
-    #             # Sample a new noise matrix
-    #             self.policy.reset_noise(env.num_envs)
-
-    #         with th.no_grad():
-    #             # Convert to pytorch tensor or to TensorDict
-    #             obs_tensor = obs_as_tensor(self._last_obs, self.device)
-    #             actions, values, log_probs = self.policy(obs_tensor)
-    #         actions = actions.cpu().numpy()
-
-    #         # Rescale and perform action
-    #         clipped_actions = actions
-    #         # Clip the actions to avoid out of bound error
-    #         if isinstance(self.action_space, spaces.Box):
-    #             clipped_actions = np.clip(actions, self.action_space.low, self.action_space.high)
-
-    #         new_obs, rewards, dones, infos = env.step(clipped_actions)
-
-    #         self.num_timesteps += env.num_envs
-
-    #         # Give access to local variables
-    #         callback.update_locals(locals())
-    #         if callback.on_step() is False:
-    #             return False
-
-    #         self._update_info_buffer(infos)
-    #         n_steps += 1
-
-    #         if isinstance(self.action_space, spaces.Discrete):
-    #             # Reshape in case of discrete action
-    #             actions = actions.reshape(-1, 1)
-
-    #         # Handle timeout by bootstraping with value function
-    #         # see GitHub issue #633
-    #         for idx, done in enumerate(dones):
-    #             if (
-    #                 done
-    #                 and infos[idx].get("terminal_observation") is not None
-    #                 and infos[idx].get("TimeLimit.truncated", False)
-    #             ):
-    #                 terminal_obs = self.policy.obs_to_tensor(infos[idx]["terminal_observation"])[0]
-    #                 with th.no_grad():
-    #                     terminal_value = self.policy.predict_values(terminal_obs)[0]  # type: ignore[arg-type]
-    #                 rewards[idx] += self.gamma * terminal_value
-
-    #         rollout_buffer.add(
-    #             self._last_obs,  # type: ignore[arg-type]
-    #             actions,
-    #             rewards,
-    #             self._last_episode_starts,  # type: ignore[arg-type]
-    #             values,
-    #             log_probs,
-    #         )
-    #         self._last_obs = new_obs  # type: ignore[assignment]
-    #         self._last_episode_starts = dones
-
-    #     with th.no_grad():
-    #         # Compute value for the last timestep
-    #         values = self.policy.predict_values(obs_as_tensor(new_obs, self.device))  # type: ignore[arg-type]
-
-    #     rollout_buffer.compute_returns_and_advantage(last_values=values, dones=dones)
-
-    #     callback.on_rollout_end()
-
-    #     return True
-
 
     def learn(
         self,

@@ -176,8 +176,7 @@ def wrap_constrained_alg(
             # process them one step at a time to collect rollout info
             episode_wise_transitions = [[] for _ in range(self.env.num_envs)]
             ep_terminated = np.zeros((self.env.num_envs,), dtype=bool)
-            task_value_past_state = None
-            constraint_value_past_state = None
+            value_past_state = None
             ref_past_state = None
             policy_past_state = None
             masks = (
@@ -222,16 +221,16 @@ def wrap_constrained_alg(
                     ), "Infinite values in log probs"
 
                     # get values
-                    task_value_outputs: ValueOutput = self.policy.forward_value(
-                        obs_tensor, task_value_past_state
+                    value_outputs: ValueOutput = self.policy.forward_value(
+                        obs_tensor, value_past_state
                     )
-                    pdb.set_trace()
-                    constraint_value_outputs = deepcopy(task_value_outputs)
-                    task_values, task_value_past_state = (
-                       task_value_outputs.values,
-                       task_value_outputs.past_model_kwargs,
+                    
+                    task_values, value_past_state = (
+                       value_outputs.values[..., 0],
+                       value_outputs.past_model_kwargs,
                     )
-                    constraint_values, constraint_value_past_state = deepcopy(task_values), deepcopy(task_value_past_state)
+                    constraint_values = value_outputs.value[..., 1]
+                    # constraint_values, constraint_value_past_state = deepcopy(task_values), deepcopy(task_value_past_state)
 
                     # get reference log probs
                     for k in obs_tensor:
@@ -280,7 +279,7 @@ def wrap_constrained_alg(
                             kl_div=kl_div.cpu().numpy()[env_ix],
                             episode_start=episode_starts[env_ix],
                             task_value=task_values[env_ix].cpu(),
-                            constraint_value=constraint_values[env_ix].cpu(),  # TODO: fix this once have real constraint values
+                            constraint_value=constraint_values[env_ix].cpu(),
                             log_prob=log_probs[env_ix].cpu(),
                             done=dones[env_ix],
                             ref_log_prob=ref_log_probs[env_ix].cpu(),

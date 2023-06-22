@@ -52,6 +52,7 @@ class CausalLMActorCriticPolicy(LMActorCriticPolicy, ActorCriticWarmStartMixin):
         state_dict: Dict[str, Any] = None,
         num_value_heads: int = 1,
     ):
+        assert num_value_heads <= 2, "Only 1 or 2 value heads are supported"
         super().__init__(
             observation_space,
             action_space,
