@@ -172,7 +172,8 @@ class ConstrainedPPO(OnPolicyAlgorithm):
         self._tracker = tracker
         self.constraint_threshold = constraint_threshold
         self.sigmoid_lagrange = sigmoid_lagrange
-        self.lagrange = th.tensor([0.5], requires_grad=True).to(self.device)
+        lagrange_init = 0.0 if sigmoid_lagrange else 0.5
+        self.lagrange = th.tensor(lagrange_init, requires_grad=True, device=self.device)
         self.lagrange_optimizer = th.optim.SGD([self.lagrange], lr=lagrange_lr, momentum=0.9)
 
 
@@ -243,7 +244,11 @@ class ConstrainedPPO(OnPolicyAlgorithm):
                                     ) / (constraint_advantages.std() + 1e-8)
                     
                 # compute mixed advantages
-                mixed_advantages = task_advantages - self.lagrange * constraint_advantages
+                if self.sigmoid_lagrange:
+                    sig_lagrange = th.sigmoid(self.lagrange)
+                    mixed_advantages = (1 - sig_lagrange) * task_advantages + sig_lagrange * constraint_advantages
+                else:
+                    mixed_advantages = task_advantages + self.lagrange * constraint_advantages
 
                 # ratio between old and new policy, should be one at the first iteration
                 ratio = th.exp(log_prob - rollout_data.old_log_prob)
@@ -293,7 +298,9 @@ class ConstrainedPPO(OnPolicyAlgorithm):
 
                 # compute lagrange multiplier loss  # TODO: see if it works better with 
                 # constraint returns instead of value estimates
-                lagrange_loss = self.lagrange * (self.constraint_threshold - rollout_data.constraint_returns).mean()
+                violation = (rollout_data.constraint_returns - self.constraint_threshold).mean()
+                lagrange = th.sigmoid(self.lagrange) if self.sigmoid_lagrange else self.lagrange
+                lagrange_loss = lagrange * violation
                 lagrange_losses.append(lagrange_loss.item())
 
                 # Calculate approximate form of reverse KL Divergence for early stopping
