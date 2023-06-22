@@ -42,6 +42,7 @@ alg:
     args:
       model_name: gpt2
       apply_model_parallel: True
+      num_value_heads: 2
       generation_kwargs:
         do_sample: True
         top_k: 20

@@ -50,6 +50,7 @@ class CausalLMActorCriticPolicy(LMActorCriticPolicy, ActorCriticWarmStartMixin):
         generation_kwargs: Dict[str, Any] = {},
         prompt_truncation_side: str = "left",
         state_dict: Dict[str, Any] = None,
+        num_value_heads: int = 1,
     ):
         super().__init__(
             observation_space,
@@ -65,6 +66,7 @@ class CausalLMActorCriticPolicy(LMActorCriticPolicy, ActorCriticWarmStartMixin):
             prompt_truncation_side,
         )
         self.load_from_dict(state_dict)
+        self.num_value_heads = num_value_heads
 
     def _build_model_heads(self, model_name: str):
         self._policy_model = AutoModelForCausalLM.from_pretrained(model_name)
@@ -75,8 +77,9 @@ class CausalLMActorCriticPolicy(LMActorCriticPolicy, ActorCriticWarmStartMixin):
         self._value_model = AutoModelForCausalLM.from_pretrained(model_name)
         self._ref_model = deepcopy(self._policy_model).eval()
 
+        # TODO: maybe the cleanest thing is to just change 1 to n_heads...if possible
         self._value_head = nn.Linear(
-            self._value_model.config.hidden_size, 1, bias=False
+            self._value_model.config.hidden_size, self.num_value_heads, bias=False
         )
 
         # apply model parallel

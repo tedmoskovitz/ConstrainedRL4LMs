@@ -222,10 +222,10 @@ def wrap_constrained_alg(
                     ), "Infinite values in log probs"
 
                     # get values
-                    pdb.set_trace()
                     task_value_outputs: ValueOutput = self.policy.forward_value(
                         obs_tensor, task_value_past_state
                     )
+                    pdb.set_trace()
                     constraint_value_outputs = deepcopy(task_value_outputs)
                     task_values, task_value_past_state = (
                        task_value_outputs.values,
