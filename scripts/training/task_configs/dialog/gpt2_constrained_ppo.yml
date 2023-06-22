@@ -34,6 +34,7 @@ alg:
     n_epochs: 5
     sigmoid_lagrange: True
     constraint_threshold: 0.06
+    lagrange_lr: 0.05
     
   kl_div:
     coeff: 0.2
