@@ -7,8 +7,8 @@ tokenizer:
 reward_fn:
   id: "intent_accuracy"
   args:
-    intent_coeff: 0.75
-    auto_coeff: 0.25
+    intent_coeff: 1.0
+    auto_coeff: 0.0
 
 
 datapool:
@@ -33,6 +33,7 @@ alg:
     learning_rate: 0.000001
     n_epochs: 5
     sigmoid_lagrange: True
+    constraint_threshold: 0.06
     
   kl_div:
     coeff: 0.2
