@@ -329,12 +329,13 @@ class ConstrainedPPO(OnPolicyAlgorithm):
                 self.policy.optimizer.step()
 
                 # Lagrange multiplier update
-                pdb.set_trace()
                 self.lagrange_optimizer.zero_grad()
                 lagrange_loss.backward()
                 th.nn.utils.clip_grad_norm_(
                     [self.lagrange], self.max_grad_norm)
                 self.lagrange_optimizer.step()
+                if not self.sigmoid_lagrange:
+                    self.lagrange.data = th.clamp(self.lagrange.data, min=0)
 
             if not continue_training:
                 break
