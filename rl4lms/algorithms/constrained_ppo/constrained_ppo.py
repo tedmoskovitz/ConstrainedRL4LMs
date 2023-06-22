@@ -376,6 +376,8 @@ class ConstrainedPPO(OnPolicyAlgorithm):
             "cppo/approx_kl": np.mean(approx_kl_divs).item(),
             "cppo/task_explained_variance": task_explained_var,
             "cppo/constraint_explained_variance": constraint_explained_var,
+            "cppo/lagrange": self.lagrange.item(),
+            "cppo/lagrange_loss": np.mean(lagrange_losses),
         }
 
         self._tracker.log_training_infos(train_info)
