@@ -229,7 +229,7 @@ def wrap_constrained_alg(
                        value_outputs.values[..., 0],
                        value_outputs.past_model_kwargs,
                     )
-                    constraint_values = value_outputs.value[..., 1]
+                    constraint_values = value_outputs.values[..., 1]
                     # constraint_values, constraint_value_past_state = deepcopy(task_values), deepcopy(task_value_past_state)
 
                     # get reference log probs
