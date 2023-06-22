@@ -113,6 +113,7 @@ class LMActorCriticPolicy(BasePolicy):
         optimizer_class: torch.optim.Optimizer = torch.optim.AdamW,
         generation_kwargs: Dict[str, Any] = {},
         prompt_truncation_side: str = "left",
+        num_value_heads: int = 1,
     ):
         """
 
@@ -132,6 +133,7 @@ class LMActorCriticPolicy(BasePolicy):
         super().__init__(observation_space, action_space)
         self._action_space = action_space
         self._apply_model_parallel = apply_model_parallel
+        self._num_value_heads = num_value_heads
         self._build_model_heads(model_name)
         self._setup_optimizer(optimizer_kwargs, weight_decay, optimizer_class)
         self._action_dist = CategoricalDistribution(self._action_space.n)
