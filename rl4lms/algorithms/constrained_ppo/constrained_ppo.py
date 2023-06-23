@@ -298,9 +298,9 @@ class ConstrainedPPO(OnPolicyAlgorithm):
 
                 # compute lagrange multiplier loss  # TODO: see if it works better with 
                 # constraint returns instead of value estimates
-                violation = (rollout_data.constraint_returns - self.constraint_threshold).mean()
+                violations = (rollout_data.constraint_returns - self.constraint_threshold).mean()
                 lagrange = th.sigmoid(self.lagrange) if self.sigmoid_lagrange else self.lagrange
-                lagrange_loss = lagrange * violation
+                lagrange_loss = lagrange * violations
                 lagrange_losses.append(lagrange_loss.item())
 
                 # Calculate approximate form of reverse KL Divergence for early stopping
@@ -356,7 +356,8 @@ class ConstrainedPPO(OnPolicyAlgorithm):
         self.logger.record("train/loss", loss.item())
         self.logger.record("train/task_explained_variance", task_explained_var)
         self.logger.record("train/constraint_explained_variance", constraint_explained_var)
-        self.logger.record("train/lagrange", self.lagrange.item())
+        lagrange = th.sigmoid(self.lagrange) if self.sigmoid_lagrange else self.lagrange
+        self.logger.record("train/lagrange", lagrange.item())
         self.logger.record("train/lagrange_loss", np.mean(lagrange_losses))
         if hasattr(self.policy, "log_std"):
             self.logger.record(
@@ -378,6 +379,8 @@ class ConstrainedPPO(OnPolicyAlgorithm):
             "cppo/constraint_explained_variance": constraint_explained_var,
             "cppo/lagrange": self.lagrange.item(),
             "cppo/lagrange_loss": np.mean(lagrange_losses),
+            "cppo/constraint_violations": violations,
+            "cppo/constraint_returns": rollout_data.constraint_returns.mean(),
         }
 
         self._tracker.log_training_infos(train_info)

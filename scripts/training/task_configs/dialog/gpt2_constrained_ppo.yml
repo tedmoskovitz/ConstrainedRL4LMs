@@ -33,7 +33,7 @@ alg:
     learning_rate: 0.000001
     n_epochs: 5
     sigmoid_lagrange: True
-    constraint_threshold: 0.05
+    constraint_threshold: 0.0
     lagrange_lr: 0.05
     
   kl_div:
