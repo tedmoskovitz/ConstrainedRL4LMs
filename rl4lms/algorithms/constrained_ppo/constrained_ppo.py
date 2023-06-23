@@ -379,8 +379,8 @@ class ConstrainedPPO(OnPolicyAlgorithm):
             "cppo/constraint_explained_variance": constraint_explained_var,
             "cppo/lagrange": self.lagrange.item(),
             "cppo/lagrange_loss": np.mean(lagrange_losses),
-            "cppo/constraint_violations": violations,
-            "cppo/constraint_returns": rollout_data.constraint_returns.mean(),
+            "cppo/constraint_violations": violations.item(),
+            "cppo/constraint_returns": rollout_data.constraint_returns.mean().item(),
         }
 
         self._tracker.log_training_infos(train_info)
