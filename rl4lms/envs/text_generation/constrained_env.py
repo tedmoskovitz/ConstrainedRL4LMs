@@ -24,6 +24,7 @@ class ConstrainedTextGenEnv(Env):
         terminate_on_eos: bool = False,
         context_start_token: Optional[int] = None,
         prompt_truncation_side: str = "left",
+        task_name: str = "intent",
         constraint_name: str = "meteor",
     ):
         """
@@ -43,6 +44,7 @@ class ConstrainedTextGenEnv(Env):
         self.tokenizer = tokenizer
         self.reward_function = reward_function
         self.max_steps = max_episode_length
+        self.task_name = task_name
         self.constraint_name = constraint_name
         self._max_text_length = (
             max_prompt_length if max_prompt_length else tokenizer.model_max_length
@@ -119,7 +121,7 @@ class ConstrainedTextGenEnv(Env):
 
         # compute reward
         if not isinstance(self.reward_function, BatchedRewardFunction):
-            reward = (
+            task_reward, constraint_reward = (
                 None
                 if self.reward_function is None
                 else self.reward_function(
@@ -130,10 +132,13 @@ class ConstrainedTextGenEnv(Env):
                     self.__current_obs.meta_info,
                 )
             )
-            constraint_reward = self.reward_function.component_rewards[self.constraint_name]
+            # task_reward = self.reward_function.component_rewards[self.task_name]
+            # constraint_reward = self.reward_function.component_rewards[self.constraint_name]
         else:
-            reward = -inf  # will be overridden later
-            constraint_reward = -inf  # will be overridden later
+            # reward = -inf  # will be overridden later
+            # task_reward = -inf  # will be overridden later
+            # constraint_reward = -inf  # will be overridden later
+            task_reward, constraint_reward = -inf, -inf  # will be overridden later
 
         # populate additional info
         info = {
@@ -143,10 +148,11 @@ class ConstrainedTextGenEnv(Env):
             "prompt_text": self.__current_obs.prompt_or_input_text,
             "prev_output": previous_obs.context_text,
             "meta_info": previous_obs.meta_info,
-            "constraint_reward": constraint_reward
+            # "task_reward": task_reward,
+            # "constraint_reward": constraint_reward
         }
 
-        return self.__current_obs.to_dict(), reward, done, info
+        return self.__current_obs.to_dict(), task_reward, constraint_reward, done, info
 
     def reset(self, sample: Sample = None) -> Dict[str, torch.tensor]:
         """

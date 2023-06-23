@@ -61,7 +61,8 @@ def unpack_observations(obs_tensor, n_envs: int):
 def compute_batched_rewards(
     episode_wise_transitions: List[List[ConstrainedTransitionInfo]],
     reward_fn: RewardFunction,
-    constraint_name: str,
+    # task_name: str,
+    # constraint_name: str,
 ):
     # first collect all the prompts, ref and gen texts
     prompts = []
@@ -82,17 +83,17 @@ def compute_batched_rewards(
             indices.append((env_ix, trans_ix))
 
     # compute rewards all at once
-    rewards = reward_fn(prompts, generated_texts, reference_texts, is_dones, meta_infos)
-    # TODO: verify reward_fn.component_rewards captures this
-    constraint_rewards = list(reward_fn.component_rewards[constraint_name])
-    all_rewards = zip(rewards, constraint_rewards)  # TODO: verify this works
+    task_rewards, constraint_rewards = reward_fn(prompts, generated_texts, reference_texts, is_dones, meta_infos)
+    # task_rewards = list(reward_fn.component_rewards[task_name])
+    # constraint_rewards = list(reward_fn.component_rewards[constraint_name])
+    all_rewards = zip(task_rewards, constraint_rewards)  # TODO: verify this works
     # rewards = rewards.numpy().flatten()
 
     # override the rewards in transitions
-    for (env_ix, trans_ix), (reward, constraint_reward) in zip(indices, all_rewards):
-        episode_wise_transitions[env_ix][trans_ix].task_reward = reward
+    for (env_ix, trans_ix), (task_reward, constraint_reward) in zip(indices, all_rewards):
+        episode_wise_transitions[env_ix][trans_ix].task_reward = task_reward
         episode_wise_transitions[env_ix][trans_ix].total_reward = (
-            reward + episode_wise_transitions[env_ix][trans_ix].kl_reward
+            task_reward + episode_wise_transitions[env_ix][trans_ix].kl_reward
         )
         episode_wise_transitions[env_ix][trans_ix].constraint_reward = constraint_reward
 
@@ -130,6 +131,7 @@ def wrap_constrained_alg(
                 n_envs=1,
             )
             self.reward_fn = self.env.get_attr("reward_function", 0)[0]
+            self.task_name = self.env.get_attr("task_name", 0)[0]
             self.constraint_name = self.env.get_attr("constraint_name", 0)[0]
 
         def get_policy_kwargs(
@@ -256,12 +258,14 @@ def wrap_constrained_alg(
 
                 # step into env to get rewards
                 actions = actions_tensor.cpu().numpy()
-                new_obs, rewards, dones, infos = self.env.step(actions)
+                new_obs, task_rewards, constraint_rewards, dones, infos = self.env.step(actions)
 
+                pdb.set_trace()
+                # task_rewards = infos[0]['task_reward']
                 self.num_timesteps += self.env.num_envs                
 
                 # compute total rewards
-                total_rewards = rewards + kl_rewards.cpu().numpy()
+                total_rewards = task_rewards + kl_rewards.cpu().numpy()
 
                 # unpack individual observations
                 unpacked_obs = unpack_observations(obs_tensor, self.env.num_envs)
@@ -273,8 +277,8 @@ def wrap_constrained_alg(
                         transtion = ConstrainedTransitionInfo(
                             observation=unpacked_obs[env_ix],
                             action=actions[env_ix],
-                            task_reward=rewards[env_ix],
-                            constraint_reward=infos[env_ix]['constraint_reward'],
+                            task_reward=task_rewards[env_ix],
+                            constraint_reward=constraint_rewards[env_ix],#infos[env_ix]['constraint_reward'],
                             total_reward=total_rewards[env_ix],
                             kl_div=kl_div.cpu().numpy()[env_ix],
                             episode_start=episode_starts[env_ix],
@@ -312,8 +316,9 @@ def wrap_constrained_alg(
             if isinstance(self.reward_fn, BatchedRewardFunction):
                 compute_batched_rewards(
                     episode_wise_transitions,
-                    self.reward_fn,
-                    self.constraint_name)
+                    self.reward_fn,)
+                    # self.task_name,
+                    # self.constraint_name)
 
             advantages_computed = False
             for ep_ix, transitions in enumerate(episode_wise_transitions):

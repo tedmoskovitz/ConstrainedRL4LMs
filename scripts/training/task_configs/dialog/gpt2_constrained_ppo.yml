@@ -8,7 +8,8 @@ reward_fn:
   id: "intent_accuracy"
   args:
     intent_coeff: 1.0
-    auto_coeff: 0.0
+    auto_coeff: 1.0
+    constraint_name: "meteor"
 
 
 datapool:
@@ -22,7 +23,8 @@ env:
     max_prompt_length: 128
     max_episode_length: 20
     terminate_on_eos: True
-    constraint_name: "meteor"
+    #task_name: "intent"
+    #constraint_name: "meteor"
 
 alg:
   id: constrained_ppo

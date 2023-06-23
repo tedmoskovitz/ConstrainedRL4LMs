@@ -17,7 +17,7 @@ from rl4lms.envs.text_generation.metric import (
     IntentAccuracyDailyDialog,
 )
 import numpy as np
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 
 class RewardFunction(ABC):
@@ -607,7 +607,11 @@ class chrF(RewardFunction):
 
 class IntentAccuracy(BatchedRewardFunction):
     def __init__(
-        self, shape: bool = True, intent_coeff: float = 1.0, auto_coeff: float = 1.0
+        self,
+        shape: bool = True,
+        intent_coeff: float = 1.0,
+        auto_coeff: float = 1.0,
+        constraint_name: Optional[str] = None,
     ) -> None:
         super().__init__()
         self._metric = None
@@ -616,6 +620,9 @@ class IntentAccuracy(BatchedRewardFunction):
         self._auto_coeff = auto_coeff
         self._shaping_metric = MeteorMetric()
         self.component_rewards = dict(meteor=None, intent=None)
+        if constraint_name is not None:
+            assert constraint_name in ["meteor", "intent"], "Invalid constraint name"
+        self._constraint_name = constraint_name
 
     def __call__(
         self,
@@ -659,9 +666,13 @@ class IntentAccuracy(BatchedRewardFunction):
         meteor_rewards = rewards.copy()
         rewards[done_ixs] += self._intent_coeff * np.array(scores)
         intent_rewards = np.zeros_like(rewards)
-        intent_rewards[done_ixs] = self._intent_coeff * np.array(scores)
+        intent_rewards[done_ixs] = np.array(scores)            
         self.component_rewards = dict(
             meteor=meteor_rewards, intent=intent_rewards)
+        if self._constraint_name is not None:
+            if self._constraint_name == "meteor":
+                return intent_rewards.tolist(), meteor_rewards.tolist()
+            return meteor_rewards.tolist(), intent_rewards.tolist()
         return rewards.tolist()
 
 
