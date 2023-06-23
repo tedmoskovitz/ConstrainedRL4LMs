@@ -99,7 +99,8 @@ def build_env(env_config: Dict[str, Any],
     }
     env_config_args = env_config.get("args", {})
     env_kwargs = {**env_kwargs, **env_config_args}
-    env_cls = ConstrainedTextGenEnv if "constraint_name" in env_config_args else TextGenEnv
+    constrained = env_config.get("constrained", False)
+    env_cls = ConstrainedTextGenEnv if constrained else TextGenEnv
     env = make_vec_env(env_cls,
                        n_envs=env_config.get("n_envs", 1),
                        vec_env_cls=SubprocVecEnv if multiprocess else None,
@@ -179,7 +180,7 @@ class OnPolicyTrainer(TrainerWarmStartMixin):
             self._datapool_config)
         self._env = build_env(self._env_config, self._reward_fn,
                               self._tokenizer, self._samples_by_split["train"],
-                              multiprocess=not self._disable_multiprocess)
+                              multiprocess=not self._disable_multiprocess,)
         self._alg = build_alg(self._on_policy_alg_config,
                               self._env, self._tracker,
                               self._policy_state_dict,
