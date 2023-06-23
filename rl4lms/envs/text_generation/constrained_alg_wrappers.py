@@ -131,8 +131,8 @@ def wrap_constrained_alg(
                 n_envs=1,
             )
             self.reward_fn = self.env.get_attr("reward_function", 0)[0]
-            self.task_name = self.env.get_attr("task_name", 0)[0]
-            self.constraint_name = self.env.get_attr("constraint_name", 0)[0]
+            # self.task_name = self.env.get_attr("task_name", 0)[0]
+            # self.constraint_name = self.env.get_attr("constraint_name", 0)[0]
 
         def get_policy_kwargs(
             self,
