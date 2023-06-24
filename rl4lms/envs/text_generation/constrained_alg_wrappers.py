@@ -258,7 +258,7 @@ def wrap_constrained_alg(
 
                 # step into env to get rewards
                 actions = actions_tensor.cpu().numpy()
-                new_obs, task_rewards, constraint_rewards, dones, infos = self.env.step(actions)
+                new_obs, task_rewards, dones, infos = self.env.step(actions)
 
                 pdb.set_trace()
                 # task_rewards = infos[0]['task_reward']
@@ -278,7 +278,7 @@ def wrap_constrained_alg(
                             observation=unpacked_obs[env_ix],
                             action=actions[env_ix],
                             task_reward=task_rewards[env_ix],
-                            constraint_reward=constraint_rewards[env_ix],#infos[env_ix]['constraint_reward'],
+                            constraint_reward=infos[env_ix]['constraint_reward'],
                             total_reward=total_rewards[env_ix],
                             kl_div=kl_div.cpu().numpy()[env_ix],
                             episode_start=episode_starts[env_ix],
