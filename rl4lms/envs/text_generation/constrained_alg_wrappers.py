@@ -260,8 +260,6 @@ def wrap_constrained_alg(
                 actions = actions_tensor.cpu().numpy()
                 new_obs, task_rewards, dones, infos = self.env.step(actions)
 
-                pdb.set_trace()
-                # task_rewards = infos[0]['task_reward']
                 self.num_timesteps += self.env.num_envs                
 
                 # compute total rewards
