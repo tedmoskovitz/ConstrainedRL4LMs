@@ -153,7 +153,7 @@ class ConstrainedTextGenEnv(Env):
             "constraint_reward": constraint_reward
         }
 
-        return self.__current_obs.to_dict(), task_reward, constraint_reward, done, info
+        return self.__current_obs.to_dict(), task_reward, done, info
 
     def reset(self, sample: Sample = None) -> Dict[str, torch.tensor]:
         """
