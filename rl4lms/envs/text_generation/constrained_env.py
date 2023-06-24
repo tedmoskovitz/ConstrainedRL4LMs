@@ -121,7 +121,7 @@ class ConstrainedTextGenEnv(Env):
 
         # compute reward
         if not isinstance(self.reward_function, BatchedRewardFunction):
-            task_reward, constraint_reward = (
+            task_reward= (
                 None
                 if self.reward_function is None
                 else self.reward_function(
@@ -134,6 +134,7 @@ class ConstrainedTextGenEnv(Env):
             )
             # task_reward = self.reward_function.component_rewards[self.task_name]
             # constraint_reward = self.reward_function.component_rewards[self.constraint_name]
+            constraint_reward = self.reward_function.constraint_rewards
         else:
             # reward = -inf  # will be overridden later
             # task_reward = -inf  # will be overridden later
@@ -149,7 +150,7 @@ class ConstrainedTextGenEnv(Env):
             "prev_output": previous_obs.context_text,
             "meta_info": previous_obs.meta_info,
             # "task_reward": task_reward,
-            # "constraint_reward": constraint_reward
+            "constraint_reward": constraint_reward
         }
 
         return self.__current_obs.to_dict(), task_reward, constraint_reward, done, info
