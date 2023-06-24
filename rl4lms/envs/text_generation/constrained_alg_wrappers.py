@@ -83,9 +83,10 @@ def compute_batched_rewards(
             indices.append((env_ix, trans_ix))
 
     # compute rewards all at once
-    task_rewards, constraint_rewards = reward_fn(prompts, generated_texts, reference_texts, is_dones, meta_infos)
+    task_rewards = reward_fn(prompts, generated_texts, reference_texts, is_dones, meta_infos)
     # task_rewards = list(reward_fn.component_rewards[task_name])
     # constraint_rewards = list(reward_fn.component_rewards[constraint_name])
+    constraint_rewards = reward_fn.constraint_rewards
     all_rewards = zip(task_rewards, constraint_rewards)  # TODO: verify this works
     # rewards = rewards.numpy().flatten()
 
