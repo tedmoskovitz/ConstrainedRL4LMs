@@ -334,8 +334,12 @@ class ConstrainedPPO(OnPolicyAlgorithm):
                 th.nn.utils.clip_grad_norm_(
                     [self.lagrange], self.max_grad_norm)
                 self.lagrange_optimizer.step()
-                if not self.sigmoid_lagrange:
+                if self.sigmoid_lagrange:
+                    # do this to prevent entering into a region where gradient is ~zero
+                    self.lagrange.data = th.clamp(self.lagrange.data, min=-2, max=2)
+                else:
                     self.lagrange.data = th.clamp(self.lagrange.data, min=0)
+
 
             if not continue_training:
                 break
