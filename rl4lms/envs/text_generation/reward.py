@@ -624,7 +624,7 @@ class IntentAccuracy(BatchedRewardFunction):
         if constraint_name is not None:
             assert constraint_name in ["meteor", "intent"], "Invalid constraint name"
         self._constraint_name = constraint_name
-        self.constraint_rewards = None
+        self.component_rewards = dict(intent_reward=None, meteor_reward=None)
 
     def __call__(
         self,
@@ -669,7 +669,8 @@ class IntentAccuracy(BatchedRewardFunction):
         rewards[done_ixs] += self._intent_coeff * np.array(scores)
         intent_rewards = np.zeros_like(rewards)
         intent_rewards[done_ixs] = np.array(scores)     
-        pdb.set_trace()       
+        self.component_rewards = dict(
+            meteor_reward=meteor_rewards, intent_reward=intent_rewards)
         if self._constraint_name is not None:
             if self._constraint_name == "meteor":
                 self.constraint_rewards = meteor_rewards.tolist()

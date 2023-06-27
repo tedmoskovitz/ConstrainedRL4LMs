@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Tuple, Type
 
 import numpy as np
+import pdb
 import torch
 from stable_baselines3.common.buffers import DictRolloutBuffer, RolloutBuffer
 from stable_baselines3.common.callbacks import BaseCallback
@@ -375,6 +376,7 @@ def wrap_onpolicy_alg(
             rollout_buffer.reset()
 
             # start the rollout process
+            pdb.set_trace()
             rollout_info = {
                 "rollout_info/ep_task_rew": [],
                 "rollout_info/ep_total_rew": [],

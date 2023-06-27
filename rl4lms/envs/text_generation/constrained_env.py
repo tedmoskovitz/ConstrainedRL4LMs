@@ -150,8 +150,10 @@ class ConstrainedTextGenEnv(Env):
             "prev_output": previous_obs.context_text,
             "meta_info": previous_obs.meta_info,
             # "task_reward": task_reward,
-            "constraint_reward": constraint_reward
+            "constraint_reward": constraint_reward,
         }
+        if hasattr(self.reward_function, "component_rewards"):
+            info.update(self.reward_function.component_rewards)
 
         return self.__current_obs.to_dict(), task_reward, done, info
 
