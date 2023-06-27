@@ -141,7 +141,6 @@ class TextGenEnv(Env):
             "prev_output": previous_obs.context_text,
             "meta_info": previous_obs.meta_info,
         }
-        pdb.set_trace()
         if hasattr(self.reward_function, "component_rewards"):
             info.update(self.reward_function.component_rewards)
 
