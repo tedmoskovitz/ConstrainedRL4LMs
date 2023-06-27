@@ -2,6 +2,7 @@ from cmath import inf
 from typing import Dict, Tuple, Optional, List
 
 import torch
+import pdb
 from gym import Env, spaces
 from gym.spaces.dict import Dict as DictSpace
 from gym.spaces.discrete import Discrete
@@ -140,6 +141,9 @@ class TextGenEnv(Env):
             "prev_output": previous_obs.context_text,
             "meta_info": previous_obs.meta_info,
         }
+        pdb.set_trace()
+        if hasattr(self.reward_function, "component_rewards"):
+            info.update(self.reward_function.component_rewards)
 
         return self.__current_obs.to_dict(), reward, done, info
 
