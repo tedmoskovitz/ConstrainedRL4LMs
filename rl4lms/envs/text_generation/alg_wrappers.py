@@ -297,6 +297,12 @@ def wrap_onpolicy_alg(
             if isinstance(self.reward_fn, BatchedRewardFunction):
                 compute_batched_rewards(episode_wise_transitions, self.reward_fn)
 
+
+            ######
+            # TODO: see if self.reward_fn.component_rewards exists ---
+            # if so, can reconstruct necessary additions to rollout_info as below
+            pdb.set_trace()
+
             advantages_computed = False
             for ep_ix, transitions in enumerate(episode_wise_transitions):
                 ep_length = len(transitions)
@@ -375,8 +381,7 @@ def wrap_onpolicy_alg(
             # reset rollout buffer and stats
             rollout_buffer.reset()
 
-            # start the rollout process
-            pdb.set_trace()
+            # start the rollout process            
             rollout_info = {
                 "rollout_info/ep_task_rew": [],
                 "rollout_info/ep_total_rew": [],
@@ -387,6 +392,12 @@ def wrap_onpolicy_alg(
                 "rollout_info/ref_log_prob": [],
                 "rollout_info/values": [],
             }
+            component_reward_keys = list(
+                env.unwrapped.get_attr(
+                "reward_function", [0])[0].component_rewards.keys())
+            component_dict = {
+                "rollout_info/ep_" + k: [] for k in component_reward_keys}
+            rollout_info.update(component_dict)
             while not rollout_buffer.full:
                 # generate batch of rollouts
                 rollout_info = self.generate_batch(
