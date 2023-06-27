@@ -1,6 +1,7 @@
 from abc import ABC, abstractclassmethod
 
 import torch
+import pdb
 from datasets import load_metric
 from rl4lms.envs.text_generation.observation import Observation
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
@@ -667,7 +668,8 @@ class IntentAccuracy(BatchedRewardFunction):
         meteor_rewards = rewards.copy()
         rewards[done_ixs] += self._intent_coeff * np.array(scores)
         intent_rewards = np.zeros_like(rewards)
-        intent_rewards[done_ixs] = np.array(scores)            
+        intent_rewards[done_ixs] = np.array(scores)     
+        pdb.set_trace()       
         if self._constraint_name is not None:
             if self._constraint_name == "meteor":
                 self.constraint_rewards = meteor_rewards.tolist()
