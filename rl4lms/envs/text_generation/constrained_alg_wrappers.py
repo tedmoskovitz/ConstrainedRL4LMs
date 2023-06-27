@@ -323,11 +323,13 @@ def wrap_constrained_alg(
             for ep_ix, transitions in enumerate(episode_wise_transitions):
                 ep_length = len(transitions)
                 total_task_reward = 0.0
+                total_total_reward = 0.0
                 total_constraint_reward = 0.0
                 total_kl_reward = 0.0
                 for transition_ix, transition in enumerate(transitions):
                     total_task_reward += transition.task_reward
                     total_constraint_reward += transition.constraint_reward
+                    total_total_reward += transition.total_reward
                     total_kl_reward += transition.kl_reward
                     rollout_info["rollout_info/kl_div_mean"].append(transition.kl_div)
                     rollout_info["rollout_info/log_prob"].append(transition.log_prob)
@@ -388,6 +390,7 @@ def wrap_constrained_alg(
 
                 rollout_info["rollout_info/ep_task_rew"].append(total_task_reward)
                 rollout_info["rollout_info/ep_constraint_rew"].append(total_constraint_reward)
+                rollout_info["rollout_info/ep_total_rew"].append(total_total_reward)
                 rollout_info["rollout_info/ep_lens"].append(ep_length)
                 rollout_info["rollout_info/ep_kl_rew"].append(total_kl_reward)
             return rollout_info

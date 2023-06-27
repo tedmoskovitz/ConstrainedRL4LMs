@@ -297,11 +297,13 @@ def wrap_onpolicy_alg(
             advantages_computed = False
             for ep_ix, transitions in enumerate(episode_wise_transitions):
                 ep_length = len(transitions)
-                total_reward = 0.0
+                total_task_reward = 0.0
+                total_total_reward = 0.0
                 total_kl_reward = 0.0
                 for transition_ix, transition in enumerate(transitions):
-                    total_reward += transition.task_reward
+                    total_task_reward += transition.task_reward
                     total_kl_reward += transition.kl_reward
+                    total_total_reward += transition.total_reward
                     rollout_info["rollout_info/kl_div_mean"].append(transition.kl_div)
                     rollout_info["rollout_info/log_prob"].append(transition.log_prob)
                     rollout_info["rollout_info/ref_log_prob"].append(
@@ -344,7 +346,8 @@ def wrap_onpolicy_alg(
                         )
                         advantages_computed = True
 
-                rollout_info["rollout_info/ep_rew"].append(total_reward)
+                rollout_info["rollout_info/ep_task_rew"].append(total_task_reward)
+                rollout_info["rollout_info/ep_total_rew"].append(total_total_reward)
                 rollout_info["rollout_info/ep_lens"].append(ep_length)
                 rollout_info["rollout_info/ep_kl_rew"].append(total_kl_reward)
             return rollout_info
@@ -371,7 +374,8 @@ def wrap_onpolicy_alg(
 
             # start the rollout process
             rollout_info = {
-                "rollout_info/ep_rew": [],
+                "rollout_info/ep_task_rew": [],
+                "rollout_info/ep_total_rew": [],
                 "rollout_info/kl_div_mean": [],
                 "rollout_info/ep_lens": [],
                 "rollout_info/ep_kl_rew": [],
