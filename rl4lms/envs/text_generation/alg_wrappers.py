@@ -85,14 +85,14 @@ def compute_batched_rewards(
     pdb.set_trace()
 
     # override the rewards in transitions
-    for (env_ix, trans_ix), reward in zip(indices, rewards):
+    for i, ((env_ix, trans_ix), reward) in enumerate(zip(indices, rewards)):
         episode_wise_transitions[env_ix][trans_ix].task_reward = reward
         episode_wise_transitions[env_ix][trans_ix].total_reward = (
             reward + episode_wise_transitions[env_ix][trans_ix].kl_reward
         )
         if hasattr(reward_fn, "component_rewards"):
             for k in component_rewards:
-                episode_wise_transitions[env_ix][trans_ix].info[k] = component_rewards[k]
+                episode_wise_transitions[env_ix][trans_ix].info[k] = component_rewards[i][k]
 
 
 
