@@ -411,6 +411,7 @@ def wrap_onpolicy_alg(
                 )
 
             # aggregate rollout info
+            pdb.set_trace()
             aggregated_rollout_info = {}
             for key, values in rollout_info.items():
                 aggregated_rollout_info[key] = np.mean(values).item()
