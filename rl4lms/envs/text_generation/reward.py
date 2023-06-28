@@ -624,7 +624,7 @@ class IntentAccuracy(BatchedRewardFunction):
         if constraint_name is not None:
             assert constraint_name in ["meteor", "intent"], "Invalid constraint name"
         self._constraint_name = constraint_name
-        self.component_rewards = dict(intent_reward=None, meteor_reward=None)
+        self.component_rewards = dict(intent_reward=0.0, meteor_reward=0.0)
 
     def __call__(
         self,
