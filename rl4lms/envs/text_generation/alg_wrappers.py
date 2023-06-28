@@ -91,7 +91,6 @@ def compute_batched_rewards(
         )
         if hasattr(reward_fn, "component_rewards"):
             for k in component_rewards:
-                pdb.set_trace()
                 episode_wise_transitions[env_ix][trans_ix].info[k] = component_rewards[k][i]
 
 
@@ -420,7 +419,6 @@ def wrap_onpolicy_alg(
                 )
 
             # aggregate rollout info
-            pdb.set_trace()
             aggregated_rollout_info = {}
             for key, values in rollout_info.items():
                 aggregated_rollout_info[key] = np.mean(values).item()
