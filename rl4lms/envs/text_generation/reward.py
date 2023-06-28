@@ -671,7 +671,7 @@ class IntentAccuracy(BatchedRewardFunction):
         intent_rewards[done_ixs] = np.array(scores) 
         meteor_coeff = 1 if self._auto_coeff == 0 else 1 / self._auto_coeff    
         self.component_rewards = dict(
-            meteor_reward=meteor_rewards / meteor_coeff, intent_reward=intent_rewards)
+            meteor_reward=meteor_rewards * meteor_coeff, intent_reward=intent_rewards)
         if self._constraint_name is not None:
             if self._constraint_name == "meteor":
                 self.constraint_rewards = meteor_rewards.tolist()
