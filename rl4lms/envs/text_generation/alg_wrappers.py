@@ -312,6 +312,7 @@ def wrap_onpolicy_alg(
                     total_task_reward += transition.task_reward
                     total_kl_reward += transition.kl_reward
                     total_total_reward += transition.total_reward
+                    pdb.set_trace()
                     for k in total_component_rewards:
                         total_component_rewards[k] += transition.info[k]
                     rollout_info["rollout_info/kl_div_mean"].append(transition.kl_div)
@@ -360,7 +361,7 @@ def wrap_onpolicy_alg(
                 rollout_info["rollout_info/ep_total_rew"].append(total_total_reward)
                 rollout_info["rollout_info/ep_lens"].append(ep_length)
                 rollout_info["rollout_info/ep_kl_rew"].append(total_kl_reward)
-                pdb.set_trace()
+                
                 for k in component_reward_names:
                     rollout_info["rollout_info/ep_" + k].append(
                         total_component_rewards[k])
