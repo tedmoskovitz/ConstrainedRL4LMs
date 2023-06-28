@@ -79,6 +79,10 @@ def compute_batched_rewards(
     # compute rewards all at once
     rewards = reward_fn(prompts, generated_texts, reference_texts, is_dones, meta_infos)
     # rewards = rewards.numpy().flatten()
+    if hasattr(reward_fn, "component_rewards"):
+        component_rewards = reward_fn.component_rewards
+
+    pdb.set_trace()
 
     # override the rewards in transitions
     for (env_ix, trans_ix), reward in zip(indices, rewards):
@@ -86,6 +90,11 @@ def compute_batched_rewards(
         episode_wise_transitions[env_ix][trans_ix].total_reward = (
             reward + episode_wise_transitions[env_ix][trans_ix].kl_reward
         )
+        if hasattr(reward_fn, "component_rewards"):
+            for k in component_rewards:
+                episode_wise_transitions[env_ix][trans_ix].info[k] = component_rewards[k]
+
+
 
 
 def wrap_onpolicy_alg(
