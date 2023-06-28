@@ -297,22 +297,23 @@ def wrap_onpolicy_alg(
             if isinstance(self.reward_fn, BatchedRewardFunction):
                 compute_batched_rewards(episode_wise_transitions, self.reward_fn)
 
-
-            ######
-            # TODO: see if self.reward_fn.component_rewards exists ---
-            # if so, can reconstruct necessary additions to rollout_info as below
-            pdb.set_trace()
-
             advantages_computed = False
             for ep_ix, transitions in enumerate(episode_wise_transitions):
                 ep_length = len(transitions)
                 total_task_reward = 0.0
                 total_total_reward = 0.0
                 total_kl_reward = 0.0
+                component_reward_names = [
+                    k for k in list(episode_wise_transitions[ep_ix][0].info.keys()) if "reward" in k]
+                n_component_rewards = len(component_reward_names)
+                total_component_rewards = dict(
+                    zip(component_reward_names, [0.0] * n_component_rewards))
                 for transition_ix, transition in enumerate(transitions):
                     total_task_reward += transition.task_reward
                     total_kl_reward += transition.kl_reward
                     total_total_reward += transition.total_reward
+                    for k in total_component_rewards:
+                        total_component_rewards[k] += transition.info[k]
                     rollout_info["rollout_info/kl_div_mean"].append(transition.kl_div)
                     rollout_info["rollout_info/log_prob"].append(transition.log_prob)
                     rollout_info["rollout_info/ref_log_prob"].append(
@@ -359,6 +360,10 @@ def wrap_onpolicy_alg(
                 rollout_info["rollout_info/ep_total_rew"].append(total_total_reward)
                 rollout_info["rollout_info/ep_lens"].append(ep_length)
                 rollout_info["rollout_info/ep_kl_rew"].append(total_kl_reward)
+                for k in component_reward_names:
+                    rollout_info["rollout_info/ep_" + k].append(
+                        total_component_rewards[k])
+
             return rollout_info
 
         def collect_rollouts(
@@ -403,6 +408,7 @@ def wrap_onpolicy_alg(
                 rollout_info = self.generate_batch(
                     rollout_buffer, tokenizer, max_steps, rollout_info
                 )
+            pdb.set_trace()
 
             # aggregate rollout info
             aggregated_rollout_info = {}
