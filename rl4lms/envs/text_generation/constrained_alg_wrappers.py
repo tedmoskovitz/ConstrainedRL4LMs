@@ -87,16 +87,20 @@ def compute_batched_rewards(
     # task_rewards = list(reward_fn.component_rewards[task_name])
     # constraint_rewards = list(reward_fn.component_rewards[constraint_name])
     constraint_rewards = reward_fn.constraint_rewards
+    component_rewards = reward_fn.component_rewards
     all_rewards = zip(task_rewards, constraint_rewards)  # TODO: verify this works
     # rewards = rewards.numpy().flatten()
 
     # override the rewards in transitions
-    for (env_ix, trans_ix), (task_reward, constraint_reward) in zip(indices, all_rewards):
+    for i, ((env_ix, trans_ix), (task_reward, constraint_reward)) in enumerate(zip(indices, all_rewards)):
         episode_wise_transitions[env_ix][trans_ix].task_reward = task_reward
         episode_wise_transitions[env_ix][trans_ix].total_reward = (
             task_reward + episode_wise_transitions[env_ix][trans_ix].kl_reward
         )
         episode_wise_transitions[env_ix][trans_ix].constraint_reward = constraint_reward
+        for k in component_rewards:
+            episode_wise_transitions[env_ix][trans_ix].info[k] = component_rewards[k][i]
+
 
 
 def wrap_constrained_alg(
@@ -326,11 +330,18 @@ def wrap_constrained_alg(
                 total_total_reward = 0.0
                 total_constraint_reward = 0.0
                 total_kl_reward = 0.0
+                component_reward_names = [
+                    k for k in list(episode_wise_transitions[ep_ix][0].info.keys()) if "reward" in k]
+                n_component_rewards = len(component_reward_names)
+                total_component_rewards = dict(
+                    zip(component_reward_names, [0.0] * n_component_rewards))
                 for transition_ix, transition in enumerate(transitions):
                     total_task_reward += transition.task_reward
                     total_constraint_reward += transition.constraint_reward
                     total_total_reward += transition.total_reward
                     total_kl_reward += transition.kl_reward
+                    for k in total_component_rewards:
+                        total_component_rewards[k] += transition.info[k]
                     rollout_info["rollout_info/kl_div_mean"].append(transition.kl_div)
                     rollout_info["rollout_info/log_prob"].append(transition.log_prob)
                     rollout_info["rollout_info/ref_log_prob"].append(
@@ -393,6 +404,10 @@ def wrap_constrained_alg(
                 rollout_info["rollout_info/ep_total_rew"].append(total_total_reward)
                 rollout_info["rollout_info/ep_lens"].append(ep_length)
                 rollout_info["rollout_info/ep_kl_rew"].append(total_kl_reward)
+
+                for k in component_reward_names:
+                    rollout_info["rollout_info/ep_" + k].append(
+                        total_component_rewards[k])
             return rollout_info
 
         def collect_rollouts(
@@ -427,6 +442,13 @@ def wrap_constrained_alg(
                 "rollout_info/task_values": [],
                 "rollout_info/constraint_values": [],
             }
+            component_reward_keys = list(
+                env.unwrapped.get_attr(
+                "reward_function", [0])[0].component_rewards.keys())
+            component_dict = {
+                "rollout_info/ep_" + k: [] for k in component_reward_keys}
+            rollout_info.update(component_dict)
+
             while not rollout_buffer.full:
                 # generate batch of rollouts
                 rollout_info = self.generate_batch(

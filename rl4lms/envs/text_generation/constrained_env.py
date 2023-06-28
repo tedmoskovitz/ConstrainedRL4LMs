@@ -152,6 +152,7 @@ class ConstrainedTextGenEnv(Env):
             # "task_reward": task_reward,
             "constraint_reward": constraint_reward,
         }
+        
         if hasattr(self.reward_function, "component_rewards"):
             info.update(self.reward_function.component_rewards)
 
