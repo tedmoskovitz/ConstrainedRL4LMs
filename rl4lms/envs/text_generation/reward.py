@@ -660,18 +660,19 @@ class IntentAccuracy(BatchedRewardFunction):
                     score = self._shaping_metric.compute(
                         done_prompt_texts, done_gen_texts, done_ref_texts
                     )
-                    rewards[ix] = self._auto_coeff * score["lexical/meteor"][1]
+                    rewards[ix] = score["lexical/meteor"][1] # self._auto_coeff * score["lexical/meteor"][1]
 
         scores = self._metric.compute(
             done_prompt_texts, done_gen_texts, done_ref_texts, done_meta_infos
         )["intent/accuracy"][0]
         meteor_rewards = rewards.copy()
+        rewards *= self._auto_coeff
         rewards[done_ixs] += self._intent_coeff * np.array(scores)
         intent_rewards = np.zeros_like(rewards)
         intent_rewards[done_ixs] = np.array(scores) 
-        meteor_coeff = 1 if self._auto_coeff == 0 else 1 / self._auto_coeff    
+        # meteor_coeff = 1 if self._auto_coeff == 0 else 1 / self._auto_coeff    
         self.component_rewards = dict(
-            meteor_reward=meteor_rewards * meteor_coeff, intent_reward=intent_rewards)
+            meteor_reward=meteor_rewards, intent_reward=intent_rewards) #  * meteor_coeff
         if self._constraint_name is not None:
             if self._constraint_name == "meteor":
                 self.constraint_rewards = meteor_rewards.tolist()
