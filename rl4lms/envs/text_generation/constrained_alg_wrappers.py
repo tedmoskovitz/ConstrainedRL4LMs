@@ -331,7 +331,7 @@ def wrap_constrained_alg(
                 total_constraint_reward = 0.0
                 total_kl_reward = 0.0
                 component_reward_names = [
-                    k for k in list(episode_wise_transitions[ep_ix][0].info.keys()) if "reward" in k]
+                    k for k in list(episode_wise_transitions[ep_ix][0].info.keys()) if ("reward" in k and "constraint" not in k)]
                 n_component_rewards = len(component_reward_names)
                 total_component_rewards = dict(
                     zip(component_reward_names, [0.0] * n_component_rewards))
