@@ -7,9 +7,9 @@ tokenizer:
 reward_fn:
   id: "intent_accuracy"
   args:
-    intent_coeff: 1.0
+    intent_coeff: 0.0
     auto_coeff: 1.0
-    constraint_name: "meteor"
+    constraint_name: "intent"
 
 
 datapool:
@@ -35,9 +35,11 @@ alg:
     verbose: 1
     learning_rate: 0.000001
     n_epochs: 5
-    sigmoid_lagrange: True
+    sigmoid_lagrange: False
     constraint_threshold: -5.0
     lagrange_lr: 0.1
+    fixed_lagrange: True
+    lagrange_init: 0.0
     
   kl_div:
     coeff: 0.2

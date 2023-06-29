@@ -109,6 +109,8 @@ class ConstrainedPPO(OnPolicyAlgorithm):
         constraint_threshold: float = 0.1,
         sigmoid_lagrange: bool = True,
         lagrange_lr: float = 1e-2,
+        lagrange_init: Optional[float] = None,
+        fixed_lagrange: bool = False,
     ):
 
         super().__init__(
@@ -172,9 +174,11 @@ class ConstrainedPPO(OnPolicyAlgorithm):
         self._tracker = tracker
         self.constraint_threshold = constraint_threshold
         self.sigmoid_lagrange = sigmoid_lagrange
-        lagrange_init = 0.0 if sigmoid_lagrange else 0.5
+        if lagrange_init is None:
+            lagrange_init = 0.0 if sigmoid_lagrange else 0.5
         self.lagrange = th.tensor(lagrange_init, requires_grad=True, device=self.device)
         self.lagrange_optimizer = th.optim.SGD([self.lagrange], lr=lagrange_lr, momentum=0.9)
+        self.fixed_lagrange = fixed_lagrange
 
 
         if _init_setup_model:
@@ -329,16 +333,17 @@ class ConstrainedPPO(OnPolicyAlgorithm):
                 self.policy.optimizer.step()
 
                 # Lagrange multiplier update
-                self.lagrange_optimizer.zero_grad()
-                lagrange_loss.backward()
-                th.nn.utils.clip_grad_norm_(
-                    [self.lagrange], self.max_grad_norm)
-                self.lagrange_optimizer.step()
-                if self.sigmoid_lagrange:
-                    # do this to prevent entering into a region where gradient is ~zero
-                    self.lagrange.data = th.clamp(self.lagrange.data, min=-4.5, max=4.5)
-                else:
-                    self.lagrange.data = th.clamp(self.lagrange.data, min=0)
+                if not self.fixed_lagrange:
+                    self.lagrange_optimizer.zero_grad()
+                    lagrange_loss.backward()
+                    th.nn.utils.clip_grad_norm_(
+                        [self.lagrange], self.max_grad_norm)
+                    self.lagrange_optimizer.step()
+                    if self.sigmoid_lagrange:
+                        # do this to prevent entering into a region where gradient is ~zero
+                        self.lagrange.data = th.clamp(self.lagrange.data, min=-4.5, max=4.5)
+                    else:
+                        self.lagrange.data = th.clamp(self.lagrange.data, min=0)
 
 
             if not continue_training:
