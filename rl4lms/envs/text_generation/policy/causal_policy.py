@@ -79,14 +79,14 @@ class CausalLMActorCriticPolicy(LMActorCriticPolicy, ActorCriticWarmStartMixin):
         self._ref_model = deepcopy(self._policy_model).eval()
 
         self._value_head = nn.Linear(
-            self._value_model.config.hidden_size, 1, bias=False
+            self._value_model.config.hidden_size, self._num_value_heads, bias=False
         )
-        if self._num_value_heads > 1:
-            self._constraint_value_head = nn.Linear(
-                self._value_model.config.hidden_size, 1, bias=False
-            )
-        else:
-            self._constraint_value_head = None
+        # if self._num_value_heads > 1:
+        #     self._constraint_value_head = nn.Linear(
+        #         self._value_model.config.hidden_size, 1, bias=False
+        #     )
+        # else:
+        #     self._constraint_value_head = None
 
         # apply model parallel
         if torch.cuda.is_available():
@@ -95,10 +95,10 @@ class CausalLMActorCriticPolicy(LMActorCriticPolicy, ActorCriticWarmStartMixin):
                 self._ref_model.parallelize()
                 self._value_model.parallelize()
                 self._value_head = self._value_head.to(self.device)
-                if self._constraint_value_head:
-                    self._constraint_value_head = self._constraint_value_head.to(
-                        self.device
-                    )
+                # if self._constraint_value_head:
+                #     self._constraint_value_head = self._constraint_value_head.to(
+                #         self.device
+                #     )
             else:  # else defaults to data parallel
                 self._policy_model = torch.nn.DataParallel(self._policy_model)
                 self._ref_model = torch.nn.DataParallel(self._ref_model)
@@ -106,10 +106,10 @@ class CausalLMActorCriticPolicy(LMActorCriticPolicy, ActorCriticWarmStartMixin):
                 self._value_head = torch.nn.DataParallel(
                     self._value_head.to(self.device)
                 )
-                if self._constraint_value_head:
-                    self._constraint_value_head = torch.nn.DataParallel(
-                        self._constraint_value_head.to(self.device)
-                    )
+                # if self._constraint_value_head:
+                #     self._constraint_value_head = torch.nn.DataParallel(
+                #         self._constraint_value_head.to(self.device)
+                #     )
 
     def _prepare_inputs_for_model(
         self,
@@ -207,10 +207,10 @@ class CausalLMActorCriticPolicy(LMActorCriticPolicy, ActorCriticWarmStartMixin):
         # pool the hidden states ?
         last_tokens_hidden = output.hidden_states[-1][:, -1, :].to(self.device)
         values = self._value_head.forward(last_tokens_hidden)
-        if self._constraint_value_head:
-            constraint_values = self._constraint_value_head.forward(
-                last_tokens_hidden)
-            values = torch.cat([values, constraint_values], dim=-1) 
+        # if self._constraint_value_head:
+        #     constraint_values = self._constraint_value_head.forward(
+        #         last_tokens_hidden)
+        #     values = torch.cat([values, constraint_values], dim=-1) 
 
         # update the model kwargs for further generation
         past_model_kwargs = unwrap_model(
@@ -299,8 +299,8 @@ class CausalLMActorCriticPolicy(LMActorCriticPolicy, ActorCriticWarmStartMixin):
     def to(self, device: str):
         if self._apply_model_parallel:
             self._value_head = self._value_head.to(device)
-            if self._constraint_value_head:
-                self._constraint_value_head = self._constraint_value_head.to(device)
+            # if self._constraint_value_head:
+            #     self._constraint_value_head = self._constraint_value_head.to(device)
             return self
         else:
             return super().to(device)
