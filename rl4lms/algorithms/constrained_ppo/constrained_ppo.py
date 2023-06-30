@@ -287,7 +287,7 @@ class ConstrainedPPO(OnPolicyAlgorithm):
                 task_value_losses.append(task_value_loss.item())
                 constraint_value_loss = F.mse_loss(rollout_data.constraint_returns, constraint_values_pred)
                 constraint_value_losses.append(constraint_value_loss.item())
-                value_loss = task_value_loss # + constraint_value_loss
+                value_loss = task_value_loss + constraint_value_loss
 
                 # Entropy loss favor exploration
                 if entropy is None:

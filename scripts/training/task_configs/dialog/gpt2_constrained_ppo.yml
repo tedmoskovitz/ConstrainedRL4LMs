@@ -40,6 +40,7 @@ alg:
     lagrange_lr: 0.1
     fixed_lagrange: True
     lagrange_init: 0.0
+    vf_coef: 0.25  # usually 0.5
     
   kl_div:
     coeff: 0.2
