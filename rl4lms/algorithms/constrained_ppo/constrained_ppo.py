@@ -381,10 +381,10 @@ class ConstrainedPPO(OnPolicyAlgorithm):
         train_info = {
             "ppo/entropy_loss":  np.mean(entropy_losses).item(),
             "ppo/policy_gradient_loss": np.mean(pg_losses).item(),
-            "ppo/task_value_loss": np.mean(task_value_losses).item(),
+            "ppo/value_loss": np.mean(task_value_losses).item(),
             "ppo/constraint_value_loss": np.mean(constraint_value_losses).item(),
             "ppo/approx_kl": np.mean(approx_kl_divs).item(),
-            "ppo/task_explained_variance": task_explained_var,
+            "ppo/explained_variance": task_explained_var,
             "ppo/constraint_explained_variance": constraint_explained_var,
             "ppo/lagrange": lagrange.item(),
             "ppo/lagrange_loss": np.mean(lagrange_losses),
