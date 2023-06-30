@@ -287,7 +287,7 @@ class ConstrainedPPO(OnPolicyAlgorithm):
                 task_value_losses.append(task_value_loss.item())
                 constraint_value_loss = F.mse_loss(rollout_data.constraint_returns, constraint_values_pred)
                 constraint_value_losses.append(constraint_value_loss.item())
-                value_loss = task_value_loss + constraint_value_loss
+                value_loss = task_value_loss # + constraint_value_loss
 
                 # Entropy loss favor exploration
                 if entropy is None:
@@ -379,17 +379,17 @@ class ConstrainedPPO(OnPolicyAlgorithm):
             self.logger.record("train/clip_range_vf", clip_range_vf)
 
         train_info = {
-            "cppo/entropy_loss":  np.mean(entropy_losses).item(),
-            "cppo/policy_gradient_loss": np.mean(pg_losses).item(),
-            "cppo/task_value_loss": np.mean(task_value_losses).item(),
-            "cppo/constraint_value_loss": np.mean(constraint_value_losses).item(),
-            "cppo/approx_kl": np.mean(approx_kl_divs).item(),
-            "cppo/task_explained_variance": task_explained_var,
-            "cppo/constraint_explained_variance": constraint_explained_var,
-            "cppo/lagrange": lagrange.item(),
-            "cppo/lagrange_loss": np.mean(lagrange_losses),
-            "cppo/constraint_violations": violations.item(),
-            "cppo/constraint_returns": rollout_data.constraint_returns.mean().item(),
+            "ppo/entropy_loss":  np.mean(entropy_losses).item(),
+            "ppo/policy_gradient_loss": np.mean(pg_losses).item(),
+            "ppo/task_value_loss": np.mean(task_value_losses).item(),
+            "ppo/constraint_value_loss": np.mean(constraint_value_losses).item(),
+            "ppo/approx_kl": np.mean(approx_kl_divs).item(),
+            "ppo/task_explained_variance": task_explained_var,
+            "ppo/constraint_explained_variance": constraint_explained_var,
+            "ppo/lagrange": lagrange.item(),
+            "ppo/lagrange_loss": np.mean(lagrange_losses),
+            "ppo/constraint_violations": violations.item(),
+            "ppo/constraint_returns": rollout_data.constraint_returns.mean().item(),
         }
 
         self._tracker.log_training_infos(train_info)
