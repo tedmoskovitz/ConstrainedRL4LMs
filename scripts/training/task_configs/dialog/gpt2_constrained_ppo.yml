@@ -7,7 +7,7 @@ tokenizer:
 reward_fn:
   id: "intent_accuracy"
   args:
-    intent_coeff: 1.0
+    intent_coeff: 0.5
     auto_coeff: 1.0
     constraint_name: "intent"
 

@@ -665,11 +665,11 @@ class IntentAccuracy(BatchedRewardFunction):
         scores = self._metric.compute(
             done_prompt_texts, done_gen_texts, done_ref_texts, done_meta_infos
         )["intent/accuracy"][0]
-        meteor_rewards = rewards.copy()
+        meteor_rewards = rewards.copy() * self._auto_coeff
         rewards *= self._auto_coeff
         rewards[done_ixs] += self._intent_coeff * np.array(scores)
         intent_rewards = np.zeros_like(rewards)
-        intent_rewards[done_ixs] = np.array(scores) 
+        intent_rewards[done_ixs] = np.array(scores)  * self._intent_coeff
         # meteor_coeff = 1 if self._auto_coeff == 0 else 1 / self._auto_coeff    
         self.component_rewards = dict(
             meteor_reward=meteor_rewards, intent_reward=intent_rewards) #  * meteor_coeff
