@@ -53,6 +53,7 @@ class ConstrainedPPO(OnPolicyAlgorithm):
     :param normalize_advantage: Whether to normalize or not the advantage
     :param ent_coef: Entropy coefficient for the loss calculation
     :param vf_coef: Value function coefficient for the loss calculation
+    :param constraint_vf_coef: Constraint value function coefficient for the loss calculation
     :param max_grad_norm: The maximum value for the gradient clipping
     :param use_sde: Whether to use generalized State Dependent Exploration (gSDE)
         instead of action noise exploration (default: False)
@@ -95,6 +96,7 @@ class ConstrainedPPO(OnPolicyAlgorithm):
         normalize_advantage: bool = True,
         ent_coef: float = 0.0,
         vf_coef: float = 0.5,
+        constraint_vf_coef: float = 0.5,
         max_grad_norm: float = 0.5,
         use_sde: bool = False,
         sde_sample_freq: int = -1,
@@ -169,6 +171,7 @@ class ConstrainedPPO(OnPolicyAlgorithm):
         self.n_epochs = n_epochs
         self.clip_range = clip_range
         self.clip_range_vf = clip_range_vf
+        self.constraint_vf_coef = constraint_vf_coef
         self.normalize_advantage = normalize_advantage
         self.target_kl = target_kl
         self._tracker = tracker
@@ -287,7 +290,7 @@ class ConstrainedPPO(OnPolicyAlgorithm):
                 task_value_losses.append(task_value_loss.item())
                 constraint_value_loss = F.mse_loss(rollout_data.constraint_returns, constraint_values_pred)
                 constraint_value_losses.append(constraint_value_loss.item())
-                value_loss = task_value_loss + constraint_value_loss
+                value_loss = self.vf_coef * task_value_loss + self.constraint_vf_coef * constraint_value_loss
 
                 # Entropy loss favor exploration
                 if entropy is None:
@@ -298,7 +301,7 @@ class ConstrainedPPO(OnPolicyAlgorithm):
 
                 entropy_losses.append(entropy_loss.item())
 
-                loss = policy_loss + self.ent_coef * entropy_loss + self.vf_coef * value_loss
+                loss = policy_loss + self.ent_coef * entropy_loss + value_loss
 
                 # compute lagrange multiplier loss  # TODO: see if it works better with 
                 # constraint returns instead of value estimates

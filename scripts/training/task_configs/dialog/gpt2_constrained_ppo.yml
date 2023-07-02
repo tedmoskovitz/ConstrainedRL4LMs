@@ -7,7 +7,7 @@ tokenizer:
 reward_fn:
   id: "intent_accuracy"
   args:
-    intent_coeff: 0.5
+    intent_coeff: 1.0
     auto_coeff: 1.0
     constraint_name: "intent"
 
@@ -30,7 +30,7 @@ env:
 alg:
   id: constrained_ppo
   args: 
-    n_steps: 256
+    n_steps: 128
     batch_size: 64
     verbose: 1
     learning_rate: 0.000001
@@ -40,7 +40,8 @@ alg:
     lagrange_lr: 0.1
     fixed_lagrange: True
     lagrange_init: 0.0
-    vf_coef: 0.25  # usually 0.5
+    vf_coef: 0.5  # usually 0.5
+    constraint_vf_coef: 0.25
     
   kl_div:
     coeff: 0.2
