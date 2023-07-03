@@ -365,7 +365,6 @@ def wrap_constrained_alg(
                     if rollout_buffer.full and not advantages_computed:
 
                         # normalize the rewards
-                        pdb.set_trace()
                         if self._norm_reward:
                             mean = rollout_buffer.task_rewards.mean()
                             std = rollout_buffer.task_rewards.std()
