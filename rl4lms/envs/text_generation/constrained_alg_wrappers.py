@@ -136,8 +136,6 @@ def wrap_constrained_alg(
                 n_envs=1,
             )
             self.reward_fn = self.env.get_attr("reward_function", 0)[0]
-            # self.task_name = self.env.get_attr("task_name", 0)[0]
-            # self.constraint_name = self.env.get_attr("constraint_name", 0)[0]
 
         def get_policy_kwargs(
             self,
@@ -369,7 +367,7 @@ def wrap_constrained_alg(
                         # normalize the rewards
                         if self._norm_reward:
                             mean = rollout_buffer.task_rewards.mean()
-                            std = rollout_buffer.constraint_rewards.std()
+                            std = rollout_buffer.task_rewards.std()
                             rollout_buffer.task_rewards = (rollout_buffer.task_rewards - mean) / (
                                 std + 1e-8
                             )
