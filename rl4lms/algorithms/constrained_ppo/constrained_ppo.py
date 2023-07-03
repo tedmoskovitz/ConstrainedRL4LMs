@@ -240,7 +240,6 @@ class ConstrainedPPO(OnPolicyAlgorithm):
                 values, log_prob, entropy = evaluation_output.values, evaluation_output.log_prob, evaluation_output.entropy
                 task_values = values[..., 0].flatten()
                 constraint_values = values[..., 1].flatten()
-                # values = values.flatten()
                 # Normalize advantage
                 task_advantages = rollout_data.task_advantages
                 constraint_advantages = rollout_data.constraint_advantages
@@ -256,6 +255,7 @@ class ConstrainedPPO(OnPolicyAlgorithm):
                     mixed_advantages = (1 - sig_lagrange) * task_advantages + sig_lagrange * constraint_advantages
                 else:
                     mixed_advantages = task_advantages + self.lagrange * constraint_advantages
+
 
                 # ratio between old and new policy, should be one at the first iteration
                 ratio = th.exp(log_prob - rollout_data.old_log_prob)

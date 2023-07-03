@@ -231,7 +231,7 @@ class OnPolicyTrainer(TrainerWarmStartMixin):
 
             # evaluate on val set in the given intervals
             if (epoch + 1) % self._train_eval_config["eval_every"] == 0:
-                self._evaluate_on_datapools(epoch=epoch, splits=["val"])
+                self._evaluate_on_datapools(epoch=epoch)  #, splits=["val"])  # TODO: change back
 
         # finally evaluate on val and test samples
         self._evaluate_on_datapools(epoch=epoch)
