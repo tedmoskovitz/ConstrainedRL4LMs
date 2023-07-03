@@ -61,7 +61,8 @@ class Tracker:
                 entity=self._entity_name,
                 project=self._project_name,
                 name=self._experiment_name,
-                config=self._config
+                config=self._config,
+                settings=wandb.Settings(code_dir=".")
             )
 
     def log_predictions(self, epoch: int,
