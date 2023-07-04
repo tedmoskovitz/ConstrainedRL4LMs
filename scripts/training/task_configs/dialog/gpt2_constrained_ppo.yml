@@ -36,7 +36,7 @@ alg:
     learning_rate: 0.000001
     n_epochs: 5
     sigmoid_lagrange: True  #False
-    constraint_threshold: 0.18  #-5.0
+    constraint_threshold: 0.1  #-5.0
     lagrange_lr: 0.1
     fixed_lagrange: False  #True
     # lagrange_init: 0.0

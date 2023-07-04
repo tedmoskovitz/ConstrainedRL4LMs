@@ -88,8 +88,7 @@ def compute_batched_rewards(
     # constraint_rewards = list(reward_fn.component_rewards[constraint_name])
     constraint_rewards = reward_fn.constraint_rewards
     component_rewards = reward_fn.component_rewards
-    all_rewards = zip(task_rewards, constraint_rewards)  # TODO: verify this works
-    # rewards = rewards.numpy().flatten()
+    all_rewards = zip(task_rewards, constraint_rewards)
 
     # override the rewards in transitions
     for i, ((env_ix, trans_ix), (task_reward, constraint_reward)) in enumerate(zip(indices, all_rewards)):
@@ -97,7 +96,9 @@ def compute_batched_rewards(
         episode_wise_transitions[env_ix][trans_ix].total_reward = (
             task_reward + episode_wise_transitions[env_ix][trans_ix].kl_reward
         )
-        episode_wise_transitions[env_ix][trans_ix].constraint_reward = constraint_reward
+        episode_wise_transitions[env_ix][trans_ix].constraint_reward = (
+            constraint_reward + episode_wise_transitions[env_ix][trans_ix].kl_reward
+        )  # TODO(this is kind of shitty)
         for k in component_rewards:
             episode_wise_transitions[env_ix][trans_ix].info[k] = component_rewards[k][i]
 
@@ -262,11 +263,15 @@ def wrap_constrained_alg(
                 # step into env to get rewards
                 actions = actions_tensor.cpu().numpy()
                 new_obs, task_rewards, dones, infos = self.env.step(actions)
+                constraint_rewards = infos[env_ix]['constraint_reward']
 
                 self.num_timesteps += self.env.num_envs                
 
                 # compute total rewards
-                total_rewards = task_rewards + kl_rewards.cpu().numpy()
+                kl_rew = kl_rewards.cpu().numpy()
+                total_task_rewards = task_rewards + kl_rew
+                total_constraint_rewards = constraint_rewards + kl_rew
+            
 
                 # unpack individual observations
                 unpacked_obs = unpack_observations(obs_tensor, self.env.num_envs)
@@ -279,8 +284,8 @@ def wrap_constrained_alg(
                             observation=unpacked_obs[env_ix],
                             action=actions[env_ix],
                             task_reward=task_rewards[env_ix],
-                            constraint_reward=infos[env_ix]['constraint_reward'],
-                            total_reward=total_rewards[env_ix],
+                            constraint_reward=total_constraint_rewards[env_ix],  # TODO(this is kind of shitty)
+                            total_reward=total_task_rewards[env_ix],
                             kl_div=kl_div.cpu().numpy()[env_ix],
                             episode_start=episode_starts[env_ix],
                             task_value=task_values[env_ix].cpu(),
