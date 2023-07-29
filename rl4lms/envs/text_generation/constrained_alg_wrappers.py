@@ -263,7 +263,8 @@ def wrap_constrained_alg(
                 # step into env to get rewards
                 actions = actions_tensor.cpu().numpy()
                 new_obs, task_rewards, dones, infos = self.env.step(actions)
-                constraint_rewards = infos[env_ix]['constraint_reward']
+                constraint_rewards = np.stack([
+                    infos[env_ix]['constraint_reward'] for env_ix in range(self.env.num_envs)])
 
                 self.num_timesteps += self.env.num_envs                
 
