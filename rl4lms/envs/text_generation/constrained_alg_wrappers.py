@@ -36,6 +36,7 @@ class ConstrainedTransitionInfo:
     episode_start: np.ndarray
     task_value: torch.Tensor
     constraint_value: torch.Tensor
+    kl_value: torch.Tensor
     log_prob: torch.Tensor
     done: np.ndarray
     ref_log_prob: torch.Tensor
@@ -98,7 +99,7 @@ def compute_batched_rewards(
         )
         episode_wise_transitions[env_ix][trans_ix].constraint_reward = (
             constraint_reward + episode_wise_transitions[env_ix][trans_ix].kl_reward
-        )  # TODO(this is kind of shitty)
+        )
         for k in component_rewards:
             episode_wise_transitions[env_ix][trans_ix].info[k] = component_rewards[k][i]
 
@@ -236,6 +237,7 @@ def wrap_constrained_alg(
                        value_outputs.past_model_kwargs,
                     )
                     constraint_values = value_outputs.values[..., 1]
+                    kl_values = value_outputs.values[..., 2]
                     # constraint_values, constraint_value_past_state = deepcopy(task_values), deepcopy(task_value_past_state)
 
                     # get reference log probs
@@ -285,12 +287,13 @@ def wrap_constrained_alg(
                             observation=unpacked_obs[env_ix],
                             action=actions[env_ix],
                             task_reward=task_rewards[env_ix],
-                            constraint_reward=total_constraint_rewards[env_ix],  # TODO(this is kind of shitty)
+                            constraint_reward=total_constraint_rewards[env_ix],
                             total_reward=total_task_rewards[env_ix],
                             kl_div=kl_div.cpu().numpy()[env_ix],
                             episode_start=episode_starts[env_ix],
                             task_value=task_values[env_ix].cpu(),
                             constraint_value=constraint_values[env_ix].cpu(),
+                            kl_value=kl_values[env_ix].cpu(),
                             log_prob=log_probs[env_ix].cpu(),
                             done=dones[env_ix],
                             ref_log_prob=ref_log_probs[env_ix].cpu(),
@@ -353,6 +356,7 @@ def wrap_constrained_alg(
                     )
                     rollout_info["rollout_info/task_values"].append(transition.task_value.numpy())
                     rollout_info["rollout_info/constraint_values"].append(transition.constraint_value.numpy())
+                    rollout_info["rollout_info/kl_values"].append(transition.kl_value.numpy())
 
                     if not rollout_buffer.full:
                         rollout_buffer.add(
@@ -360,9 +364,11 @@ def wrap_constrained_alg(
                             transition.action,
                             transition.total_reward,
                             transition.constraint_reward,
+                            transition.kl_reward,
                             transition.episode_start,
                             transition.task_value,
                             transition.constraint_value,
+                            transition.kl_value,
                             transition.log_prob,
                             action_masks=transition.action_mask,
                         )
@@ -395,10 +401,16 @@ def wrap_constrained_alg(
                             if (transition_ix + 1) < ep_length
                             else torch.tensor([0.0])
                         )
+                        next_kl_values = (
+                            transitions[transition_ix + 1].kl_value
+                            if (transition_ix + 1) < ep_length
+                            else torch.tensor([0.0])
+                        )
 
                         rollout_buffer.compute_returns_and_advantage(
                             last_task_values=next_task_values,
                             last_constraint_values=next_constraint_values,
+                            last_kl_values=next_kl_values,
                             dones=transition.done
                         )
                         advantages_computed = True
@@ -446,6 +458,7 @@ def wrap_constrained_alg(
                 "rollout_info/ref_log_prob": [],
                 "rollout_info/task_values": [],
                 "rollout_info/constraint_values": [],
+                "rollout_info/kl_values": [],
             }
             component_reward_keys = list(
                 env.unwrapped.get_attr(

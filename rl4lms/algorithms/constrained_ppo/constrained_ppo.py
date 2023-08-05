@@ -97,6 +97,7 @@ class ConstrainedPPO(OnPolicyAlgorithm):
         ent_coef: float = 0.0,
         vf_coef: float = 0.5,
         constraint_vf_coef: float = 0.5,
+        kl_vf_coef: float = 0.5,
         max_grad_norm: float = 0.5,
         use_sde: bool = False,
         sde_sample_freq: int = -1,
@@ -172,6 +173,7 @@ class ConstrainedPPO(OnPolicyAlgorithm):
         self.clip_range = clip_range
         self.clip_range_vf = clip_range_vf
         self.constraint_vf_coef = constraint_vf_coef
+        self.kl_vf_coef = kl_vf_coef
         self.normalize_advantage = normalize_advantage
         self.target_kl = target_kl
         self._tracker = tracker
@@ -215,6 +217,7 @@ class ConstrainedPPO(OnPolicyAlgorithm):
 
         entropy_losses = []
         pg_losses, task_value_losses, constraint_value_losses = [], [], []
+        kl_value_losses = []
         lagrange_losses = []
         clip_fractions = []
 
@@ -240,6 +243,7 @@ class ConstrainedPPO(OnPolicyAlgorithm):
                 values, log_prob, entropy = evaluation_output.values, evaluation_output.log_prob, evaluation_output.entropy
                 task_values = values[..., 0].flatten()
                 constraint_values = values[..., 1].flatten()
+                kl_values = values[..., 2].flatten()
                 # Normalize advantage
                 task_advantages = rollout_data.task_advantages
                 constraint_advantages = rollout_data.constraint_advantages
@@ -248,6 +252,7 @@ class ConstrainedPPO(OnPolicyAlgorithm):
                                   ) / (task_advantages.std() + 1e-8)
                     constraint_advantages = (constraint_advantages - constraint_advantages.mean()
                                     ) / (constraint_advantages.std() + 1e-8)
+                    
                     
                 # compute mixed advantages
                 if self.sigmoid_lagrange:
@@ -285,12 +290,18 @@ class ConstrainedPPO(OnPolicyAlgorithm):
                     constraint_values_pred = rollout_data.old_constraint_values + th.clamp(
                         constraint_values - rollout_data.old_constraint_values, -clip_range_vf, clip_range_vf
                     )
+                    kl_values_pred = rollout_data.old_kl_values + th.clamp(
+                        kl_values - rollout_data.old_kl_values, -clip_range_vf, clip_range_vf
+                    )
                 # Value loss using the TD(gae_lambda) target
                 task_value_loss = F.mse_loss(rollout_data.task_returns, task_values_pred)
                 task_value_losses.append(task_value_loss.item())
                 constraint_value_loss = F.mse_loss(rollout_data.constraint_returns, constraint_values_pred)
                 constraint_value_losses.append(constraint_value_loss.item())
+                kl_value_loss = F.mse_loss(rollout_data.kl_returns, kl_values_pred)
+                kl_value_losses.append(kl_value_loss.item())
                 value_loss = self.vf_coef * task_value_loss + self.constraint_vf_coef * constraint_value_loss
+                value_loss += self.kl_vf_coef * kl_value_loss
 
                 # Entropy loss favor exploration
                 if entropy is None:
@@ -305,7 +316,11 @@ class ConstrainedPPO(OnPolicyAlgorithm):
 
                 # compute lagrange multiplier loss  # TODO: see if it works better with 
                 # constraint returns instead of value estimates
-                violations = (rollout_data.constraint_returns - self.constraint_threshold).mean()
+                # we need to cancel out the kl returns so that the constraint is only over the
+                # actual constraint reward function
+                # constraint_return = actual_constraint_return + kl_return
+                actual_constraint_returns = rollout_data.constraint_returns - rollout_data.kl_returns
+                violations = (actual_constraint_returns - self.constraint_threshold).mean()
                 lagrange = th.sigmoid(self.lagrange) if self.sigmoid_lagrange else self.lagrange
                 lagrange_loss = lagrange * violations
                 lagrange_losses.append(lagrange_loss.item())

@@ -20,11 +20,14 @@ class MaskableConstrainedRolloutBufferSamples(NamedTuple):
     actions: th.Tensor
     old_task_values: th.Tensor
     old_constraint_values: th.Tensor
+    old_kl_values: th.Tensor
     old_log_prob: th.Tensor
     task_advantages: th.Tensor
     constraint_advantages: th.Tensor
+    kl_advantages: th.Tensor
     task_returns: th.Tensor
     constraint_returns: th.Tensor
+    kl_returns: th.Tensor
     action_masks: th.Tensor
 
 
@@ -33,11 +36,14 @@ class MaskableConstrainedDictRolloutBufferSamples(MaskableConstrainedRolloutBuff
     actions: th.Tensor
     old_task_values: th.Tensor
     old_constraint_values: th.Tensor
+    old_kl_values: th.Tensor
     old_log_prob: th.Tensor
     task_advantages: th.Tensor
     constraint_advantages: th.Tensor
+    kl_advantages: th.Tensor
     task_returns: th.Tensor
     constraint_returns: th.Tensor
+    kl_returns: th.Tensor
     action_masks: th.Tensor
 
 
@@ -96,11 +102,14 @@ class MaskableConstrainedRolloutBuffer(ConstrainedRolloutBuffer):
                 "actions",
                 "task_values",
                 "constraint_values",
+                "kl_values",
                 "log_probs",
                 "task_advantages",
                 "constraint_advantages",
+                "kl_advantages",
                 "task_returns",
                 "constraint_returns",
+                "kl_returns",
                 "action_masks",
             ]:
                 self.__dict__[tensor] = self.swap_and_flatten(
@@ -122,11 +131,14 @@ class MaskableConstrainedRolloutBuffer(ConstrainedRolloutBuffer):
             self.actions[batch_inds],
             self.task_values[batch_inds].flatten(),
             self.constraint_values[batch_inds].flatten(),
+            self.kl_values[batch_inds].flatten(),
             self.log_probs[batch_inds].flatten(),
             self.task_advantages[batch_inds].flatten(),
             self.constraint_advantages[batch_inds].flatten(),
+            self.kl_advantages[batch_inds].flatten(),
             self.task_returns[batch_inds].flatten(),
             self.constraint_returns[batch_inds].flatten(),
+            self.kl_returns[batch_inds].flatten(),
             self.action_masks[batch_inds].reshape(-1, self.mask_dims),
         )
         return MaskableConstrainedRolloutBufferSamples(*map(self.to_torch, data))
@@ -211,11 +223,14 @@ class MaskableConstrainedDictRolloutBuffer(ConstrainedDictRolloutBuffer):
                 "actions",
                 "task_values",
                 "constraint_values",
+                "kl_values",
                 "log_probs",
                 "task_advantages",
                 "constraint_advantages",
+                "kl_advantages",
                 "task_returns",
                 "constraint_returns",
+                "kl_returns",
                 "action_masks"]
 
             for tensor in _tensor_names:
@@ -240,11 +255,14 @@ class MaskableConstrainedDictRolloutBuffer(ConstrainedDictRolloutBuffer):
             actions=self.to_torch(self.actions[batch_inds]),
             old_task_values=self.to_torch(self.task_values[batch_inds].flatten()),
             old_constraint_values=self.to_torch(self.constraint_values[batch_inds].flatten()),
+            old_kl_values=self.to_torch(self.kl_values[batch_inds].flatten()),
             old_log_prob=self.to_torch(self.log_probs[batch_inds].flatten()),
             task_advantages=self.to_torch(self.task_advantages[batch_inds].flatten()),
             constraint_advantages=self.to_torch(self.constraint_advantages[batch_inds].flatten()),
+            kl_advantages=self.to_torch(self.kl_advantages[batch_inds].flatten()),
             task_returns=self.to_torch(self.task_returns[batch_inds].flatten()),
             constraint_returns=self.to_torch(self.constraint_returns[batch_inds].flatten()),
+            kl_returns=self.to_torch(self.kl_returns[batch_inds].flatten()),
             action_masks=self.to_torch(
                 self.action_masks[batch_inds].reshape(-1, self.mask_dims)),
         )
@@ -328,11 +346,14 @@ class MaskableConstrainedDictRolloutBuffer(ConstrainedDictRolloutBuffer):
             _tensor_names = ["actions",
                              "task_values",
                              "constraint_values",
+                             "kl_values",
                              "log_probs",
                              "task_advantages",
                              "constraint_advantages",
+                             "kl_advantages",
                              "task_returns",
                              "constraint_returns",
+                             "kl_returns",
                              "action_masks"]
 
             for tensor in _tensor_names:
@@ -357,11 +378,14 @@ class MaskableConstrainedDictRolloutBuffer(ConstrainedDictRolloutBuffer):
             actions=self.to_torch(self.actions[batch_inds]),
             old_task_values=self.to_torch(self.task_values[batch_inds].flatten()),
             old_constraint_values=self.to_torch(self.constraint_values[batch_inds].flatten()),
+            old_kl_values=self.to_torch(self.kl_values[batch_inds].flatten()),
             old_log_prob=self.to_torch(self.log_probs[batch_inds].flatten()),
             task_advantages=self.to_torch(self.task_advantages[batch_inds].flatten()),
             constraint_advantages=self.to_torch(self.constraint_advantages[batch_inds].flatten()),
+            kl_advantages=self.to_torch(self.kl_advantages[batch_inds].flatten()),
             task_returns=self.to_torch(self.task_returns[batch_inds].flatten()),
             constraint_returns=self.to_torch(self.constraint_returns[batch_inds].flatten()),
+            kl_returns=self.to_torch(self.kl_returns[batch_inds].flatten()),
             action_masks=self.to_torch(
                 self.action_masks[batch_inds].reshape(-1, self.mask_dims)),
         )
