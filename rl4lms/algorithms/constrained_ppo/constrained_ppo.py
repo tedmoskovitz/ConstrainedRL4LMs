@@ -281,6 +281,7 @@ class ConstrainedPPO(OnPolicyAlgorithm):
                     # No clipping
                     task_values_pred = task_values
                     constraint_values_pred = constraint_values
+                    kl_values_pred = kl_values
                 else:
                     # Clip the different between old and new value
                     # NOTE: this depends on the reward scaling
