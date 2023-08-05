@@ -217,7 +217,7 @@ class ConstrainedPPO(OnPolicyAlgorithm):
 
         entropy_losses = []
         pg_losses, task_value_losses, constraint_value_losses = [], [], []
-        kl_value_losses = []
+        kl_value_losses, actual_constraint_returns_list = [], []
         lagrange_losses = []
         clip_fractions = []
 
@@ -325,6 +325,7 @@ class ConstrainedPPO(OnPolicyAlgorithm):
                 lagrange = th.sigmoid(self.lagrange) if self.sigmoid_lagrange else self.lagrange
                 lagrange_loss = lagrange * violations
                 lagrange_losses.append(lagrange_loss.item())
+                actual_constraint_returns_list.append(actual_constraint_returns.mean().item())
 
                 # Calculate approximate form of reverse KL Divergence for early stopping
                 # see issue #417: https://github.com/DLR-RM/stable-baselines3/issues/417
@@ -379,6 +380,7 @@ class ConstrainedPPO(OnPolicyAlgorithm):
         self.logger.record("train/policy_gradient_loss", np.mean(pg_losses))
         self.logger.record("train/task_value_loss", np.mean(task_value_losses))
         self.logger.record("train/constraint_value_loss", np.mean(constraint_value_losses))
+        self.logger.record("train/kl_value_loss", np.mean(kl_value_losses))
         self.logger.record("train/approx_kl", np.mean(approx_kl_divs))
         self.logger.record("train/clip_fraction", np.mean(clip_fractions))
         self.logger.record("train/loss", loss.item())
@@ -402,6 +404,7 @@ class ConstrainedPPO(OnPolicyAlgorithm):
             "ppo/policy_gradient_loss": np.mean(pg_losses).item(),
             "ppo/value_loss": np.mean(task_value_losses).item(),
             "ppo/constraint_value_loss": np.mean(constraint_value_losses).item(),
+            "ppo/kl_value_loss": np.mean(kl_value_losses).item(),
             "ppo/approx_kl": np.mean(approx_kl_divs).item(),
             "ppo/explained_variance": task_explained_var,
             "ppo/constraint_explained_variance": constraint_explained_var,
@@ -409,6 +412,7 @@ class ConstrainedPPO(OnPolicyAlgorithm):
             "ppo/lagrange_loss": np.mean(lagrange_losses),
             "ppo/constraint_violations": violations.item(),
             "ppo/constraint_returns": rollout_data.constraint_returns.mean().item(),
+            "ppo/actual_constraint_returns": np.mean(actual_constraint_returns_list),
         }
 
         self._tracker.log_training_infos(train_info)
