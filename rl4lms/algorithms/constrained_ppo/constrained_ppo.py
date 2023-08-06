@@ -412,6 +412,7 @@ class ConstrainedPPO(OnPolicyAlgorithm):
             "ppo/lagrange_loss": np.mean(lagrange_losses),
             "ppo/constraint_violations": violations.item(),
             "ppo/constraint_returns": rollout_data.constraint_returns.mean().item(),
+            "ppo/kl_returns": rollout_data.kl_returns.mean().item(),
             "ppo/actual_constraint_returns": np.mean(actual_constraint_returns_list),
         }
 
