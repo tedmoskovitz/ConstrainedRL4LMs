@@ -389,6 +389,12 @@ def wrap_constrained_alg(
                                 std + 1e-8
                             )
 
+                            mean = rollout_buffer.kl_rewards.mean()
+                            std = rollout_buffer.kl_rewards.std()
+                            rollout_buffer.kl_rewards = (rollout_buffer.kl_rewards - mean) / (
+                                std + 1e-8
+                            )
+
                         # we fetch the last value for the last time step
                         # values come from the next transitions's values
                         next_task_values = (
