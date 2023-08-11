@@ -319,8 +319,8 @@ class ConstrainedPPO(OnPolicyAlgorithm):
                 # constraint returns instead of value estimates
                 # we need to cancel out the kl returns so that the constraint is only over the
                 # actual constraint reward function
-                # constraint_return = actual_constraint_return - kl_return
-                actual_constraint_returns = rollout_data.constraint_returns + rollout_data.kl_returns
+                # constraint_return = actual_constraint_return + kl_return
+                actual_constraint_returns = rollout_data.constraint_returns - rollout_data.kl_returns
                 violations = (actual_constraint_returns - self.constraint_threshold).mean()
                 lagrange = th.sigmoid(self.lagrange) if self.sigmoid_lagrange else self.lagrange
                 lagrange_loss = lagrange * violations
