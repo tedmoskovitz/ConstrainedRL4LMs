@@ -36,7 +36,7 @@ alg:
     learning_rate: 0.000001
     n_epochs: 5
     sigmoid_lagrange: True  #False
-    constraint_threshold: 0.4  #-5.0  # 0.1 is trivial for meteor; 0.4 is trivial for intent
+    constraint_threshold: 0.4  #-5.0  # 0.1 is trivial for meteor; 0.3 is trivial for intent
     lagrange_lr: 0.1
     fixed_lagrange: False  #True
     # lagrange_init: 0.0
