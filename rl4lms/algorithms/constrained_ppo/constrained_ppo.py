@@ -183,8 +183,8 @@ class ConstrainedPPO(OnPolicyAlgorithm):
         self.sigmoid_lagrange = sigmoid_lagrange
         if lagrange_init is None:
             lagrange_init = 0.0 if sigmoid_lagrange else 0.5
-            if maximize_kl_reward:
-                lagrange_init = [lagrange_init] * 2
+        if maximize_kl_reward:
+            lagrange_init = [lagrange_init] * 2
         self.lagrange = th.tensor(
             lagrange_init, requires_grad=True, device=self.device, dtype=th.float32)
         self.lagrange_optimizer = th.optim.SGD([self.lagrange], lr=lagrange_lr, momentum=0.9)
