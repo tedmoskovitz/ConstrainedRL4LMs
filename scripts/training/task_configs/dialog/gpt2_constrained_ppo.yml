@@ -37,7 +37,7 @@ alg:
     n_epochs: 5
     sigmoid_lagrange: True  #False
     # constraint thresholds == intent threshold
-    constraint_threshold: 0.47569656313373887 #0.3  #-5.0  # 0.1 is trivial for meteor; 0.3 is trivial for intent
+    constraint_threshold: 0.0 #0.47569656313373887 #0.3  #-5.0  # 0.1 is trivial for meteor; 0.3 is trivial for intent
     lagrange_lr: 0.1
     fixed_lagrange: False #True
     # lagrange_init: 0.0
@@ -46,7 +46,7 @@ alg:
     kl_vf_coef: 0.2  # 0.1
     maximize_kl_reward: True
     # task threshold == meteor threshold
-    task_threshold: 0.22540687657414987 #0.1
+    task_threshold: -0.5 #0.22540687657414987 #0.1
     # we'll current consider "task" == METEOR, "constraint" == Intent
     
   kl_div:
