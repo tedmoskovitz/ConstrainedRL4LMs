@@ -51,7 +51,7 @@ alg:
     
   kl_div:
     coeff: 0.2  # initial coeff
-    target_kl: None  # to use a fixed coefficient, set to None; target is really
+    # target_kl: 0.5  # to use a fixed coefficient, set to None; target is really
     # more like an upper-bound; if kl is below target, then decrease coeff, else
     # increase it (it's essentially like a Lagrange multiplier)
     # default value is 0.5
