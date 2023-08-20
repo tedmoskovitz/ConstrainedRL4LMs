@@ -339,17 +339,17 @@ class ConstrainedPPO(OnPolicyAlgorithm):
                 # constraint_return = actual_constraint_return + kl_return
                 if self.maximize_kl_reward: # TODO: this is a hack, need to re-name/clean-up
                     # [batch_size,]
-                    constraint_violations = rollout_data.constraint_returns - self.constraint_threshold
+                    constraint_violations = (rollout_data.constraint_returns - self.constraint_threshold).mean()
                     # [batch_size,]
-                    task_violations = rollout_data.task_returns - self.task_threshold
+                    task_violations = (rollout_data.task_returns - self.task_threshold).mean()
                     # [n_constriants,]
                     lagrange = th.sigmoid(self.lagrange) if self.sigmoid_lagrange else self.lagrange
-                    lagrange_loss = lagrange[0] * task_violations.mean() + lagrange[1] * constraint_violations.mean()
+                    lagrange_loss = lagrange[0] * task_violations + lagrange[1] * constraint_violations
                 else:
                     actual_constraint_returns = rollout_data.constraint_returns - rollout_data.kl_returns
-                    violations = (actual_constraint_returns - self.constraint_threshold).mean()
+                    constraint_violations = (actual_constraint_returns - self.constraint_threshold).mean()
                     lagrange = th.sigmoid(self.lagrange) if self.sigmoid_lagrange else self.lagrange
-                    lagrange_loss = lagrange * violations
+                    lagrange_loss = lagrange * constraint_violations
                     actual_constraint_returns_list.append(actual_constraint_returns.mean().item())
                 lagrange_losses.append(lagrange_loss.item())
 
@@ -435,7 +435,7 @@ class ConstrainedPPO(OnPolicyAlgorithm):
             "ppo/explained_variance": task_explained_var,
             "ppo/constraint_explained_variance": constraint_explained_var,
             "ppo/lagrange_loss": np.mean(lagrange_losses),
-            "ppo/constraint_violations": violations.item(),
+            "ppo/constraint_violations": constraint_violations.item(),
             "ppo/constraint_returns": rollout_data.constraint_returns.mean().item(),
             "ppo/task_returns": rollout_data.task_returns.mean().item(),
             "ppo/kl_returns": rollout_data.kl_returns.mean().item(),
@@ -443,7 +443,8 @@ class ConstrainedPPO(OnPolicyAlgorithm):
         }
         if self.maximize_kl_reward:
             train_info.update({"ppo/task_lagrange": lagrange[0].item(),
-                               "ppo/constraint_lagrange": lagrange[1].item(),})
+                               "ppo/constraint_lagrange": lagrange[1].item(),
+                               "ppo/task_violations": task_violations.item()})
         else:
             train_info.update({"ppo/lagrange": lagrange.item(),})
 
