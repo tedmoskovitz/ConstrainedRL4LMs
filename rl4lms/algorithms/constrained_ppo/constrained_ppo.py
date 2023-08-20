@@ -413,7 +413,7 @@ class ConstrainedPPO(OnPolicyAlgorithm):
         self.logger.record("train/task_explained_variance", task_explained_var)
         self.logger.record("train/constraint_explained_variance", constraint_explained_var)
         lagrange = th.sigmoid(self.lagrange) if self.sigmoid_lagrange else self.lagrange
-        self.logger.record("train/lagrange", lagrange.item())
+        # self.logger.record("train/lagrange", lagrange.item())
         self.logger.record("train/lagrange_loss", np.mean(lagrange_losses))
         if hasattr(self.policy, "log_std"):
             self.logger.record(
