@@ -337,7 +337,6 @@ class ConstrainedPPO(OnPolicyAlgorithm):
                 # we need to cancel out the kl returns so that the constraint is only over the
                 # actual constraint reward function
                 # constraint_return = actual_constraint_return + kl_return
-                pdb.set_trace()
                 if self.maximize_kl_reward: # TODO: this is a hack, need to re-name/clean-up
                     # [batch_size,]
                     constraint_violations = rollout_data.constraint_returns.mean() - self.constraint_threshold
