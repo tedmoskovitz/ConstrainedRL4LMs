@@ -62,6 +62,7 @@ def unpack_observations(obs_tensor, n_envs: int):
 def compute_batched_rewards(
     episode_wise_transitions: List[List[ConstrainedTransitionInfo]],
     reward_fn: RewardFunction,
+    separate_kl_reward: bool,
     # task_name: str,
     # constraint_name: str,
 ):
@@ -92,13 +93,14 @@ def compute_batched_rewards(
     all_rewards = zip(task_rewards, constraint_rewards)
 
     # override the rewards in transitions
+    kl_coeff = 0.0 if separate_kl_reward else 1.0
     for i, ((env_ix, trans_ix), (task_reward, constraint_reward)) in enumerate(zip(indices, all_rewards)):
         episode_wise_transitions[env_ix][trans_ix].task_reward = task_reward
         episode_wise_transitions[env_ix][trans_ix].total_reward = (
-            task_reward + episode_wise_transitions[env_ix][trans_ix].kl_reward
+            task_reward + kl_coeff * episode_wise_transitions[env_ix][trans_ix].kl_reward
         )
         episode_wise_transitions[env_ix][trans_ix].constraint_reward = (
-            constraint_reward + episode_wise_transitions[env_ix][trans_ix].kl_reward
+            constraint_reward + kl_coeff * episode_wise_transitions[env_ix][trans_ix].kl_reward
         )
         for k in component_rewards:
             episode_wise_transitions[env_ix][trans_ix].info[k] = component_rewards[k][i]
@@ -138,6 +140,7 @@ def wrap_constrained_alg(
                 n_envs=1,
             )
             self.reward_fn = self.env.get_attr("reward_function", 0)[0]
+            self.separate_kl_reward = "maximize_kl_reward" in alg_kwargs and alg_kwargs["maximize_kl_reward"]
 
         def get_policy_kwargs(
             self,
@@ -238,7 +241,6 @@ def wrap_constrained_alg(
                     )
                     constraint_values = value_outputs.values[..., 1]
                     kl_values = value_outputs.values[..., 2]
-                    # constraint_values, constraint_value_past_state = deepcopy(task_values), deepcopy(task_value_past_state)
 
                     # get reference log probs
                     for k in obs_tensor:
@@ -272,8 +274,12 @@ def wrap_constrained_alg(
 
                 # compute total rewards
                 kl_rew = kl_rewards.cpu().numpy()
-                total_task_rewards = task_rewards + kl_rew
-                total_constraint_rewards = constraint_rewards + kl_rew
+                if self.separate_kl_reward:
+                    total_task_rewards = task_rewards
+                    total_constraint_rewards = constraint_rewards
+                else:
+                    total_task_rewards = task_rewards + kl_rew
+                    total_constraint_rewards = constraint_rewards + kl_rew
             
 
                 # unpack individual observations
@@ -326,7 +332,8 @@ def wrap_constrained_alg(
             if isinstance(self.reward_fn, BatchedRewardFunction):
                 compute_batched_rewards(
                     episode_wise_transitions,
-                    self.reward_fn,)
+                    self.reward_fn,
+                    self.separate_kl_reward,)
                     # self.task_name,
                     # self.constraint_name)
 

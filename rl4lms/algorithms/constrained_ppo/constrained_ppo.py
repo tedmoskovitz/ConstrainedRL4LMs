@@ -114,6 +114,8 @@ class ConstrainedPPO(OnPolicyAlgorithm):
         lagrange_lr: float = 1e-2,
         lagrange_init: Optional[float] = None,
         fixed_lagrange: bool = False,
+        maximize_kl_reward: bool = True,
+        task_threshold: float = 0.1,
     ):
 
         super().__init__(
@@ -181,9 +183,14 @@ class ConstrainedPPO(OnPolicyAlgorithm):
         self.sigmoid_lagrange = sigmoid_lagrange
         if lagrange_init is None:
             lagrange_init = 0.0 if sigmoid_lagrange else 0.5
-        self.lagrange = th.tensor(lagrange_init, requires_grad=True, device=self.device)
+            if maximize_kl_reward:
+                lagrange_init = [lagrange_init] * 2
+        self.lagrange = th.tensor(
+            lagrange_init, requires_grad=True, device=self.device, dtype=th.float32)
         self.lagrange_optimizer = th.optim.SGD([self.lagrange], lr=lagrange_lr, momentum=0.9)
         self.fixed_lagrange = fixed_lagrange
+        self.maximize_kl_reward = maximize_kl_reward
+        self.task_threshold = task_threshold
 
 
         if _init_setup_model:
@@ -247,19 +254,29 @@ class ConstrainedPPO(OnPolicyAlgorithm):
                 # Normalize advantage
                 task_advantages = rollout_data.task_advantages
                 constraint_advantages = rollout_data.constraint_advantages
+                kl_advantages = rollout_data.kl_advantages
                 if self.normalize_advantage:
                     task_advantages = (task_advantages - task_advantages.mean()
                                   ) / (task_advantages.std() + 1e-8)
                     constraint_advantages = (constraint_advantages - constraint_advantages.mean()
                                     ) / (constraint_advantages.std() + 1e-8)
+                    kl_advantages = (kl_advantages - kl_advantages.mean()
+                                    ) / (kl_advantages.std() + 1e-8)
                     
                     
                 # compute mixed advantages
-                if self.sigmoid_lagrange:
-                    sig_lagrange = th.sigmoid(self.lagrange)
-                    mixed_advantages = (1 - sig_lagrange) * task_advantages + sig_lagrange * constraint_advantages
+                if self.maximize_kl_reward:
+                    if self.sigmoid_lagrange:
+                        sig_lagrange = th.sigmoid(self.lagrange)
+                        mixed_advantages = (2 - sig_lagrange.sum()) * kl_advantages + sig_lagrange[0] * task_advantages + sig_lagrange[1] * constraint_advantages
+                    else:
+                        mixed_advantages = kl_advantages * self.lagrange[0] * task_advantages + self.lagrange[1] * constraint_advantages
                 else:
-                    mixed_advantages = task_advantages + self.lagrange * constraint_advantages
+                    if self.sigmoid_lagrange:
+                        sig_lagrange = th.sigmoid(self.lagrange)
+                        mixed_advantages = (1 - sig_lagrange) * task_advantages + sig_lagrange * constraint_advantages
+                    else:
+                        mixed_advantages = task_advantages + self.lagrange * constraint_advantages
 
 
                 # ratio between old and new policy, should be one at the first iteration
@@ -320,12 +337,21 @@ class ConstrainedPPO(OnPolicyAlgorithm):
                 # we need to cancel out the kl returns so that the constraint is only over the
                 # actual constraint reward function
                 # constraint_return = actual_constraint_return + kl_return
-                actual_constraint_returns = rollout_data.constraint_returns - rollout_data.kl_returns
-                violations = (actual_constraint_returns - self.constraint_threshold).mean()
-                lagrange = th.sigmoid(self.lagrange) if self.sigmoid_lagrange else self.lagrange
-                lagrange_loss = lagrange * violations
+                if self.maximize_kl_reward: # TODO: this is a hack, need to re-name/clean-up
+                    # [batch_size,]
+                    constraint_violations = rollout_data.constraint_returns - self.constraint_threshold
+                    # [batch_size,]
+                    task_violations = rollout_data.task_returns - self.task_threshold
+                    # [n_constriants,]
+                    lagrange = th.sigmoid(self.lagrange) if self.sigmoid_lagrange else self.lagrange
+                    lagrange_loss = lagrange[0] * task_violations.mean() + lagrange[1] * constraint_violations.mean()
+                else:
+                    actual_constraint_returns = rollout_data.constraint_returns - rollout_data.kl_returns
+                    violations = (actual_constraint_returns - self.constraint_threshold).mean()
+                    lagrange = th.sigmoid(self.lagrange) if self.sigmoid_lagrange else self.lagrange
+                    lagrange_loss = lagrange * violations
+                    actual_constraint_returns_list.append(actual_constraint_returns.mean().item())
                 lagrange_losses.append(lagrange_loss.item())
-                actual_constraint_returns_list.append(actual_constraint_returns.mean().item())
 
                 # Calculate approximate form of reverse KL Divergence for early stopping
                 # see issue #417: https://github.com/DLR-RM/stable-baselines3/issues/417
@@ -408,13 +434,18 @@ class ConstrainedPPO(OnPolicyAlgorithm):
             "ppo/approx_kl": np.mean(approx_kl_divs).item(),
             "ppo/explained_variance": task_explained_var,
             "ppo/constraint_explained_variance": constraint_explained_var,
-            "ppo/lagrange": lagrange.item(),
             "ppo/lagrange_loss": np.mean(lagrange_losses),
             "ppo/constraint_violations": violations.item(),
             "ppo/constraint_returns": rollout_data.constraint_returns.mean().item(),
+            "ppo/task_returns": rollout_data.task_returns.mean().item(),
             "ppo/kl_returns": rollout_data.kl_returns.mean().item(),
             "ppo/actual_constraint_returns": np.mean(actual_constraint_returns_list),
         }
+        if self.maximize_kl_reward:
+            train_info.update({"ppo/task_lagrange": lagrange[0].item(),
+                               "ppo/constraint_lagrange": lagrange[1].item(),})
+        else:
+            train_info.update({"ppo/lagrange": lagrange.item(),})
 
         self._tracker.log_training_infos(train_info)
 
