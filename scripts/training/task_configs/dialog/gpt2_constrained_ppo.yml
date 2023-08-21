@@ -51,7 +51,7 @@ alg:
     # # we'll current consider "task" == METEOR, "constraint" == Intent
     # ========================== mu-PPO - METEOR ========================== 
     maximize_kl_reward: False
-    constraint_threshold: 0.4 
+    constraint_threshold: 0.43 # 0.4 is good perf; 0.43 is oscillation zone
     vf_coef: 0.25
     constraint_vf_coef: 0.25
     kl_vf_coef: 0.1
