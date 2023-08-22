@@ -387,7 +387,8 @@ class ConstrainedPPO(OnPolicyAlgorithm):
                     self.lagrange_optimizer.step()
                     if self.sigmoid_lagrange:
                         # do this to prevent entering into a region where gradient is ~zero
-                        self.lagrange.data = self.lagrange.data  # th.clamp(self.lagrange.data, min=-4.5, max=4.5)
+                        # self.lagrange.data = self.lagrange.data
+                        self.lagrange.data = th.clamp(self.lagrange.data, min=-4.5, max=4.5)
                     else:
                         self.lagrange.data = th.clamp(self.lagrange.data, min=0)
 
