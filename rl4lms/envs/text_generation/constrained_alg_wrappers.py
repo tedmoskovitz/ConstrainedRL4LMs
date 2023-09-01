@@ -380,7 +380,6 @@ def wrap_constrained_alg(
                             action_masks=transition.action_mask,
                         )
 
-                    pdb.set_trace()
                     # if the buffer is full, compute advantages
                     if rollout_buffer.full and not advantages_computed:
 
@@ -421,6 +420,7 @@ def wrap_constrained_alg(
                             else torch.tensor([0.0])
                         )
 
+                        pdb.set_trace()
                         rollout_buffer.compute_returns_and_advantage(
                             last_task_values=next_task_values,
                             last_constraint_values=next_constraint_values,
