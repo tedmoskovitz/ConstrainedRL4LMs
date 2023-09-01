@@ -3,6 +3,7 @@ from typing import Dict, Generator, Optional, Union, NamedTuple
 import numpy as np
 import torch as th
 from gymnasium import spaces
+import pdb
 
 from stable_baselines3.common.buffers import BaseBuffer
 from stable_baselines3.common.vec_env import VecNormalize
@@ -152,6 +153,7 @@ class ConstrainedRolloutBuffer(BaseBuffer):
         last_kl_values = last_kl_values.clone().cpu().numpy().flatten()
 
         last_gae_lam = 0
+        pdb.set_trace()
         for step in reversed(range(self.buffer_size)):
             if step == self.buffer_size - 1:
                 next_non_terminal = 1.0 - dones
@@ -166,9 +168,11 @@ class ConstrainedRolloutBuffer(BaseBuffer):
             task_delta = self.task_rewards[step] + self.gamma * next_task_values * next_non_terminal - self.task_values[step]
             constraint_delta = self.constraint_rewards[step] + self.gamma * next_constraint_values * next_non_terminal - self.constraint_values[step]
             kl_delta = self.kl_rewards[step] + self.gamma * next_kl_values * next_non_terminal - self.kl_values[step]
+
             last_task_gae_lam = task_delta + self.gamma * self.gae_lambda * next_non_terminal * last_gae_lam
             last_constraint_gae_lam = constraint_delta + self.gamma * self.gae_lambda * next_non_terminal * last_gae_lam
             last_kl_gae_lam = kl_delta + self.gamma * self.gae_lambda * next_non_terminal * last_gae_lam
+
             self.task_advantages[step] = last_task_gae_lam
             self.constraint_advantages[step] = last_constraint_gae_lam
             self.kl_advantages[step] = last_kl_gae_lam

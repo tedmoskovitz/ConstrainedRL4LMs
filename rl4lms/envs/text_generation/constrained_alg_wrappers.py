@@ -380,6 +380,7 @@ def wrap_constrained_alg(
                             action_masks=transition.action_mask,
                         )
 
+                    pdb.set_trace()
                     # if the buffer is full, compute advantages
                     if rollout_buffer.full and not advantages_computed:
 
