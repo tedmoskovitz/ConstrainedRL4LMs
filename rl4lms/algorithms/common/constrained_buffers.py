@@ -162,9 +162,9 @@ class ConstrainedRolloutBuffer(BaseBuffer):
         last_task_values = last_task_values.clone().cpu().numpy().flatten()
         last_constraint_values = last_constraint_values.clone().cpu().numpy().flatten()
         last_kl_values = last_kl_values.clone().cpu().numpy().flatten()
-        last_ep_task_reward_togo = last_ep_task_reward_togo.flatten()
-        last_ep_constraint_reward_togo = last_ep_constraint_reward_togo.flatten()
-        last_ep_kl_reward_togo = last_ep_kl_reward_togo.flatten()
+        last_ep_task_reward_togo = last_ep_task_reward_togo  # .flatten()
+        last_ep_constraint_reward_togo = last_ep_constraint_reward_togo  # .flatten()
+        last_ep_kl_reward_togo = last_ep_kl_reward_togo  # .flatten()
 
         last_gae_lam = 0
         for step in reversed(range(self.buffer_size)):
