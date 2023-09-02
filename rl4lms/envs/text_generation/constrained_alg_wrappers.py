@@ -419,12 +419,30 @@ def wrap_constrained_alg(
                             if (transition_ix + 1) < ep_length
                             else torch.tensor([0.0])
                         )
+                        next_ep_task_reward_togo = (
+                            transitions[transition_ix + 1].task_reward
+                            if (transition_ix + 1) < ep_length
+                            else torch.tensor([0.0])
+                        )
+                        next_ep_constraint_reward_togo = (
+                            transitions[transition_ix + 1].constraint_reward
+                            if (transition_ix + 1) < ep_length
+                            else torch.tensor([0.0])
+                        )
+                        next_ep_kl_reward_togo = (
+                            transitions[transition_ix + 1].kl_reward
+                            if (transition_ix + 1) < ep_length
+                            else torch.tensor([0.0])
+                        )
 
                         # next_X_values is a scalar
                         rollout_buffer.compute_returns_and_advantage(
                             last_task_values=next_task_values,
                             last_constraint_values=next_constraint_values,
                             last_kl_values=next_kl_values,
+                            last_ep_total_reward_togo=next_ep_task_reward_togo,
+                            last_ep_constraint_reward_togo=next_ep_constraint_reward_togo,
+                            last_ep_kl_reward_togo=next_ep_kl_reward_togo,
                             dones=transition.done
                         )
                         advantages_computed = True

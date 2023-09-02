@@ -136,6 +136,9 @@ class ConstrainedRolloutBuffer(BaseBuffer):
             last_task_values: th.Tensor,
             last_constraint_values: th.Tensor,
             last_kl_values: th.Tensor,
+            last_ep_task_reward_togo: np.ndarray,
+            last_ep_constraint_reward_togo: np.ndarray,
+            last_ep_kl_reward_togo: np.ndarray,
             dones: np.ndarray) -> None:
         """
         Post-processing step: compute the lambda-return (TD(lambda) estimate)
@@ -159,6 +162,9 @@ class ConstrainedRolloutBuffer(BaseBuffer):
         last_task_values = last_task_values.clone().cpu().numpy().flatten()
         last_constraint_values = last_constraint_values.clone().cpu().numpy().flatten()
         last_kl_values = last_kl_values.clone().cpu().numpy().flatten()
+        last_ep_task_reward_togo = last_ep_task_reward_togo.flatten()
+        last_ep_constraint_reward_togo = last_ep_constraint_reward_togo.flatten()
+        last_ep_kl_reward_togo = last_ep_kl_reward_togo.flatten()
 
         last_gae_lam = 0
         for step in reversed(range(self.buffer_size)):
@@ -167,6 +173,9 @@ class ConstrainedRolloutBuffer(BaseBuffer):
                 next_task_values = last_task_values
                 next_constraint_values = last_constraint_values
                 next_kl_values = last_kl_values
+                next_ep_task_reward_togo = last_ep_task_reward_togo
+                next_ep_constraint_reward_togo = last_ep_constraint_reward_togo
+                next_ep_kl_reward_togo = last_ep_kl_reward_togo
             else:
                 # next_non_terminal is 0 if the next step is the beginning of a new episode
                 # and 1 otherwise. 
@@ -174,6 +183,9 @@ class ConstrainedRolloutBuffer(BaseBuffer):
                 next_task_values = self.task_values[step + 1]
                 next_constraint_values = self.constraint_values[step + 1]
                 next_kl_values = self.kl_values[step + 1]
+                next_ep_task_reward_togo = self.ep_task_reward_togo[step + 1]
+                next_ep_constraint_reward_togo = self.ep_constraint_reward_togo[step + 1]
+                next_ep_kl_reward_togo = self.ep_kl_reward_togo[step + 1]
             task_delta = self.task_rewards[step] + self.gamma * next_task_values * next_non_terminal - self.task_values[step]
             constraint_delta = self.constraint_rewards[step] + self.gamma * next_constraint_values * next_non_terminal - self.constraint_values[step]
             kl_delta = self.kl_rewards[step] + self.gamma * next_kl_values * next_non_terminal - self.kl_values[step]
@@ -190,9 +202,9 @@ class ConstrainedRolloutBuffer(BaseBuffer):
             # this is different from the return; it is simply the undiscounted sum of rewards
             # remaining in the episode
             pdb.set_trace()
-            self.ep_task_reward_togo[step] = self.task_rewards[step] + next_non_terminal * self.ep_task_reward_togo[step + 1]
-            self.ep_constraint_reward_togo[step] = self.constraint_rewards[step] + next_non_terminal * self.ep_constraint_reward_togo[step + 1]
-            self.ep_kl_reward_togo[step] = self.kl_rewards[step] + next_non_terminal * self.ep_kl_reward_togo[step + 1]
+            self.ep_task_reward_togo[step] = self.task_rewards[step] + next_non_terminal * next_ep_task_reward_togo
+            self.ep_constraint_reward_togo[step] = self.constraint_rewards[step] + next_non_terminal * next_ep_constraint_reward_togo
+            self.ep_kl_reward_togo[step] = self.kl_rewards[step] + next_non_terminal * next_ep_kl_reward_togo
         # TD(lambda) estimator, see Github PR #375 or "Telescoping in TD(lambda)"
         # in David Silver Lecture 4: https://www.youtube.com/watch?v=PnHCvfgC_ZA
         self.task_returns = self.task_advantages + self.task_values
