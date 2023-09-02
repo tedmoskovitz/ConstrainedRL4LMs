@@ -201,7 +201,6 @@ class ConstrainedRolloutBuffer(BaseBuffer):
             # track ep_reward_to_go separately for task, constraint, and kl rewards
             # this is different from the return; it is simply the undiscounted sum of rewards
             # remaining in the episode
-            pdb.set_trace()
             self.ep_task_reward_togo[step] = self.task_rewards[step] + next_non_terminal * next_ep_task_reward_togo
             self.ep_constraint_reward_togo[step] = self.constraint_rewards[step] + next_non_terminal * next_ep_constraint_reward_togo
             self.ep_kl_reward_togo[step] = self.kl_rewards[step] + next_non_terminal * next_ep_kl_reward_togo
