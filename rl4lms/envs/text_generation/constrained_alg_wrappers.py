@@ -440,7 +440,7 @@ def wrap_constrained_alg(
                             last_task_values=next_task_values,
                             last_constraint_values=next_constraint_values,
                             last_kl_values=next_kl_values,
-                            last_ep_total_reward_togo=next_ep_task_reward_togo,
+                            last_ep_task_reward_togo=next_ep_task_reward_togo,
                             last_ep_constraint_reward_togo=next_ep_constraint_reward_togo,
                             last_ep_kl_reward_togo=next_ep_kl_reward_togo,
                             dones=transition.done
