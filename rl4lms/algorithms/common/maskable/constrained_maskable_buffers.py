@@ -28,6 +28,9 @@ class MaskableConstrainedRolloutBufferSamples(NamedTuple):
     task_returns: th.Tensor
     constraint_returns: th.Tensor
     kl_returns: th.Tensor
+    ep_task_reward_togo: th.Tensor
+    ep_constraint_reward_togo: th.Tensor
+    ep_kl_reward_togo: th.Tensor
     action_masks: th.Tensor
 
 
@@ -44,6 +47,9 @@ class MaskableConstrainedDictRolloutBufferSamples(MaskableConstrainedRolloutBuff
     task_returns: th.Tensor
     constraint_returns: th.Tensor
     kl_returns: th.Tensor
+    ep_task_reward_togo: th.Tensor
+    ep_constraint_reward_togo: th.Tensor
+    ep_kl_reward_togo: th.Tensor
     action_masks: th.Tensor
 
 
@@ -110,6 +116,9 @@ class MaskableConstrainedRolloutBuffer(ConstrainedRolloutBuffer):
                 "task_returns",
                 "constraint_returns",
                 "kl_returns",
+                "ep_task_reward_togo",
+                "ep_constraint_reward_togo",
+                "ep_kl_reward_togo",
                 "action_masks",
             ]:
                 self.__dict__[tensor] = self.swap_and_flatten(
@@ -139,6 +148,9 @@ class MaskableConstrainedRolloutBuffer(ConstrainedRolloutBuffer):
             self.task_returns[batch_inds].flatten(),
             self.constraint_returns[batch_inds].flatten(),
             self.kl_returns[batch_inds].flatten(),
+            self.ep_task_reward_togo[batch_inds].flatten(),
+            self.ep_constraint_reward_togo[batch_inds].flatten(),
+            self.ep_kl_reward_togo[batch_inds].flatten(),
             self.action_masks[batch_inds].reshape(-1, self.mask_dims),
         )
         return MaskableConstrainedRolloutBufferSamples(*map(self.to_torch, data))
@@ -231,6 +243,9 @@ class MaskableConstrainedDictRolloutBuffer(ConstrainedDictRolloutBuffer):
                 "task_returns",
                 "constraint_returns",
                 "kl_returns",
+                "ep_task_reward_togo",
+                "ep_constraint_reward_togo",
+                "ep_kl_reward_togo",
                 "action_masks"]
 
             for tensor in _tensor_names:
@@ -263,6 +278,9 @@ class MaskableConstrainedDictRolloutBuffer(ConstrainedDictRolloutBuffer):
             task_returns=self.to_torch(self.task_returns[batch_inds].flatten()),
             constraint_returns=self.to_torch(self.constraint_returns[batch_inds].flatten()),
             kl_returns=self.to_torch(self.kl_returns[batch_inds].flatten()),
+            ep_task_reward_togo=self.to_torch(self.ep_task_reward_togo[batch_inds].flatten()),
+            ep_constraint_reward_togo=self.to_torch(self.ep_constraint_reward_togo[batch_inds].flatten()),
+            ep_kl_reward_togo=self.to_torch(self.ep_kl_reward_togo[batch_inds].flatten()),
             action_masks=self.to_torch(
                 self.action_masks[batch_inds].reshape(-1, self.mask_dims)),
         )
@@ -354,6 +372,9 @@ class MaskableConstrainedDictRolloutBuffer(ConstrainedDictRolloutBuffer):
                              "task_returns",
                              "constraint_returns",
                              "kl_returns",
+                             "ep_task_reward_togo",
+                             "ep_constraint_reward_togo",
+                             "ep_kl_reward_togo",
                              "action_masks"]
 
             for tensor in _tensor_names:
@@ -386,6 +407,9 @@ class MaskableConstrainedDictRolloutBuffer(ConstrainedDictRolloutBuffer):
             task_returns=self.to_torch(self.task_returns[batch_inds].flatten()),
             constraint_returns=self.to_torch(self.constraint_returns[batch_inds].flatten()),
             kl_returns=self.to_torch(self.kl_returns[batch_inds].flatten()),
+            ep_task_reward_togo=self.to_torch(self.ep_task_reward_togo[batch_inds].flatten()),
+            ep_constraint_reward_togo=self.to_torch(self.ep_constraint_reward_togo[batch_inds].flatten()),
+            ep_kl_reward_togo=self.to_torch(self.ep_kl_reward_togo[batch_inds].flatten()),
             action_masks=self.to_torch(
                 self.action_masks[batch_inds].reshape(-1, self.mask_dims)),
         )

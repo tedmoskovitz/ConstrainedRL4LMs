@@ -29,6 +29,9 @@ class ConstrainedRolloutBufferSamples(NamedTuple):
     task_returns: th.Tensor
     constraint_returns: th.Tensor
     kl_returns: th.Tensor
+    ep_task_reward_togo: th.Tensor
+    ep_constraint_reward_togo: th.Tensor
+    ep_kl_reward_togo: th.Tensor
 
 
 class ConstrainedDictRolloutBufferSamples(NamedTuple):
@@ -44,7 +47,9 @@ class ConstrainedDictRolloutBufferSamples(NamedTuple):
     task_returns: th.Tensor
     constraint_returns: th.Tensor
     kl_returns: th.Tensor
-
+    ep_task_reward_togo: th.Tensor
+    ep_constraint_reward_togo: th.Tensor
+    ep_kl_reward_togo: th.Tensor
 
 
 class ConstrainedRolloutBuffer(BaseBuffer):
@@ -112,6 +117,9 @@ class ConstrainedRolloutBuffer(BaseBuffer):
         self.task_returns = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
         self.constraint_returns = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
         self.kl_returns = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
+        self.ep_task_reward_togo = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
+        self.ep_constraint_reward_togo = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
+        self.ep_kl_reward_togo = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
         self.episode_starts = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
         self.task_values = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
         self.constraint_values = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
@@ -147,13 +155,12 @@ class ConstrainedRolloutBuffer(BaseBuffer):
         :param last_values: state value estimation for the last step (one for each env)
         :param dones: if the last step was a terminal step (one bool for each env).
         """
-        # Convert to numpy
+        # Convert to numpy; all shape [1,]
         last_task_values = last_task_values.clone().cpu().numpy().flatten()
         last_constraint_values = last_constraint_values.clone().cpu().numpy().flatten()
         last_kl_values = last_kl_values.clone().cpu().numpy().flatten()
 
         last_gae_lam = 0
-        pdb.set_trace()
         for step in reversed(range(self.buffer_size)):
             if step == self.buffer_size - 1:
                 next_non_terminal = 1.0 - dones
@@ -161,7 +168,9 @@ class ConstrainedRolloutBuffer(BaseBuffer):
                 next_constraint_values = last_constraint_values
                 next_kl_values = last_kl_values
             else:
-                next_non_terminal = 1.0 - self.episode_starts[step + 1]
+                # next_non_terminal is 0 if the next step is the beginning of a new episode
+                # and 1 otherwise. 
+                next_non_terminal = 1.0 - self.episode_starts[step + 1] 
                 next_task_values = self.task_values[step + 1]
                 next_constraint_values = self.constraint_values[step + 1]
                 next_kl_values = self.kl_values[step + 1]
@@ -176,6 +185,13 @@ class ConstrainedRolloutBuffer(BaseBuffer):
             self.task_advantages[step] = last_task_gae_lam
             self.constraint_advantages[step] = last_constraint_gae_lam
             self.kl_advantages[step] = last_kl_gae_lam
+
+            # track ep_reward_to_go separately for task, constraint, and kl rewards
+            # this is different from the return; it is simply the undiscounted sum of rewards
+            # remaining in the episode
+            self.ep_task_reward_togo[step] = self.task_rewards[step] + next_non_terminal * self.ep_task_reward_togo[step + 1]
+            self.ep_constraint_reward_togo[step] = self.constraint_rewards[step] + next_non_terminal * self.ep_constraint_reward_togo[step + 1]
+            self.ep_kl_reward_togo[step] = self.kl_rewards[step] + next_non_terminal * self.ep_kl_reward_togo[step + 1]
         # TD(lambda) estimator, see Github PR #375 or "Telescoping in TD(lambda)"
         # in David Silver Lecture 4: https://www.youtube.com/watch?v=PnHCvfgC_ZA
         self.task_returns = self.task_advantages + self.task_values
@@ -249,6 +265,9 @@ class ConstrainedRolloutBuffer(BaseBuffer):
                 "task_returns",
                 "constraint_returns",
                 "kl_returns",
+                "ep_task_reward_togo",
+                "ep_constraint_reward_togo",
+                "ep_kl_reward_togo",
             ]
 
             for tensor in _tensor_names:
@@ -282,6 +301,9 @@ class ConstrainedRolloutBuffer(BaseBuffer):
             self.task_returns[batch_inds].flatten(),
             self.constraint_returns[batch_inds].flatten(),
             self.kl_returns[batch_inds].flatten(),
+            self.ep_task_reward_togo[batch_inds].flatten(),
+            self.ep_constraint_reward_togo[batch_inds].flatten(),
+            self.ep_kl_reward_togo[batch_inds].flatten(),
         )
         return ConstrainedRolloutBufferSamples(*tuple(map(self.to_torch, data)))
 
@@ -344,6 +366,9 @@ class ConstrainedDictRolloutBuffer(ConstrainedRolloutBuffer):
         self.task_returns = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
         self.constraint_returns = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
         self.kl_returns = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
+        self.ep_task_reward_togo = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
+        self.ep_constraint_reward_togo = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
+        self.ep_kl_reward_togo = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
         self.episode_starts = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
         self.task_values = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
         self.constraint_values = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
@@ -428,7 +453,10 @@ class ConstrainedDictRolloutBuffer(ConstrainedRolloutBuffer):
                 "kl_advantages",
                 "task_returns",
                 "constraint_returns",
-                "kl_returns",]
+                "kl_returns",
+                "ep_task_reward_togo",
+                "ep_constraint_reward_togo",
+                "ep_kl_reward_togo",]
 
             for tensor in _tensor_names:
                 self.__dict__[tensor] = self.swap_and_flatten(self.__dict__[tensor])
@@ -461,4 +489,7 @@ class ConstrainedDictRolloutBuffer(ConstrainedRolloutBuffer):
             task_returns=self.to_torch(self.task_returns[batch_inds].flatten()),
             constraint_returns=self.to_torch(self.constraint_returns[batch_inds].flatten()),
             kl_returns=self.to_torch(self.kl_returns[batch_inds].flatten()),
+            ep_task_reward_togo=self.to_torch(self.ep_task_reward_togo[batch_inds].flatten()),
+            ep_constraint_reward_togo=self.to_torch(self.ep_constraint_reward_togo[batch_inds].flatten()),
+            ep_kl_reward_togo=self.to_torch(self.ep_kl_reward_togo[batch_inds].flatten()),
         )

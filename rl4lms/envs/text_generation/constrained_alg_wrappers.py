@@ -420,7 +420,7 @@ def wrap_constrained_alg(
                             else torch.tensor([0.0])
                         )
 
-                        pdb.set_trace()
+                        # next_X_values is a scalar
                         rollout_buffer.compute_returns_and_advantage(
                             last_task_values=next_task_values,
                             last_constraint_values=next_constraint_values,
