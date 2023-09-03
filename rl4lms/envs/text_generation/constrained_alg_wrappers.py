@@ -423,19 +423,18 @@ def wrap_constrained_alg(
                         next_ep_task_reward_togo = (
                             sum([transitions[ix].task_reward for ix in range(transition_ix+1, n_transitions)])
                             if (transition_ix + 1) < ep_length
-                            else torch.tensor([0.0])
+                            else np.array(0.0)
                         )
                         next_ep_constraint_reward_togo = (
                             sum([transitions[ix].constraint_reward for ix in range(transition_ix+1, n_transitions)])
                             if (transition_ix + 1) < ep_length
-                            else torch.tensor([0.0])
+                            else np.array(0.0)
                         )
                         next_ep_kl_reward_togo = (
                             sum([transitions[ix].kl_reward for ix in range(transition_ix+1, n_transitions)])
                             if (transition_ix + 1) < ep_length
-                            else torch.tensor([0.0])
+                            else np.array(0.0)
                         )
-                        pdb.set_trace()
 
                         # next_X_values is a scalar
                         rollout_buffer.compute_returns_and_advantage(
