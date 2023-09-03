@@ -435,6 +435,7 @@ def wrap_constrained_alg(
                             if (transition_ix + 1) < ep_length
                             else torch.tensor([0.0])
                         )
+                        pdb.set_trace()
 
                         # next_X_values is a scalar
                         rollout_buffer.compute_returns_and_advantage(
