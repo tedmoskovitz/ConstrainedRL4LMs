@@ -40,7 +40,7 @@ alg:
     fixed_lagrange: False #True
     # ========================== mu-PPO - KL ========================== 
     # constraint thresholds == intent threshold
-    constraint_threshold: 0.0 #0.4642419712000001 # 0.0 #0.47569656313373887 #0.3  #-5.0  # 0.1 is trivial for meteor; 0.3 is trivial for intent, 0.4 is good for intent
+    constraint_threshold: 0.404242 # 0.0 #0.4642419712000001 # 0.0 #0.47569656313373887 #0.3  #-5.0  # 0.1 is trivial for meteor; 0.3 is trivial for intent, 0.4 is good for intent
     # lagrange_init: 0.0
     vf_coef: 0.5  #0.25  # usually 0.5
     constraint_vf_coef: 0.5  # 0.25

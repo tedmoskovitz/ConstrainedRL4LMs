@@ -187,7 +187,7 @@ class ConstrainedPPO(OnPolicyAlgorithm):
             lagrange_init = [lagrange_init] * 2
         self.lagrange = th.tensor(
             lagrange_init, requires_grad=True, device=self.device, dtype=th.float32)
-        self.lagrange_optimizer = th.optim.SGD([self.lagrange], lr=lagrange_lr, momentum=0.9)
+        self.lagrange_optimizer = th.optim.SGD([self.lagrange], lr=lagrange_lr, momentum=0.2)
         self.fixed_lagrange = fixed_lagrange
         self.maximize_kl_reward = maximize_kl_reward
         self.task_threshold = task_threshold
