@@ -134,12 +134,13 @@ class ConstrainedTextGenEnv(Env):
             )
             # task_reward = self.reward_function.component_rewards[self.task_name]
             # constraint_reward = self.reward_function.component_rewards[self.constraint_name]
-            constraint_reward = self.reward_function.constraint_rewards
+            constraint_rewards = self.reward_function.constraint_rewards
         else:
             # reward = -inf  # will be overridden later
             # task_reward = -inf  # will be overridden later
             # constraint_reward = -inf  # will be overridden later
-            task_reward, constraint_reward = -inf, -inf  # will be overridden later
+            task_reward = -inf  # will be overridden later
+            constraint_rewards = {k: -inf for k in self.reward_function._constraint_names}
 
         # populate additional info
         info = {
@@ -150,7 +151,7 @@ class ConstrainedTextGenEnv(Env):
             "prev_output": previous_obs.context_text,
             "meta_info": previous_obs.meta_info,
             # "task_reward": task_reward,
-            "constraint_reward": constraint_reward,
+            "constraint_rewards": constraint_rewards,
         }
         
         if hasattr(self.reward_function, "component_rewards"):

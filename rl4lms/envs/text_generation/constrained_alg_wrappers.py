@@ -89,6 +89,7 @@ def compute_batched_rewards(
     # task_rewards = list(reward_fn.component_rewards[task_name])
     # constraint_rewards = list(reward_fn.component_rewards[constraint_name])
     constraint_rewards = reward_fn.constraint_rewards
+    constraint_rewards = np.hstack(list(constraint_rewards.values()))  # should be (n_envs, n_constraints)
     component_rewards = reward_fn.component_rewards
     all_rewards = zip(task_rewards, constraint_rewards)
 
@@ -141,6 +142,7 @@ def wrap_constrained_alg(
             )
             self.reward_fn = self.env.get_attr("reward_function", 0)[0]
             self.separate_kl_reward = "maximize_kl_reward" in alg_kwargs and alg_kwargs["maximize_kl_reward"]
+            self.n_constraints = alg_kwargs["n_constraints"]
 
         def get_policy_kwargs(
             self,
@@ -239,8 +241,8 @@ def wrap_constrained_alg(
                        value_outputs.values[..., 0],
                        value_outputs.past_model_kwargs,
                     )
-                    constraint_values = value_outputs.values[..., 1]
-                    kl_values = value_outputs.values[..., 2]
+                    kl_values = value_outputs.values[..., 1]
+                    constraint_values = value_outputs.values[..., 2:]
 
                     # get reference log probs
                     for k in obs_tensor:
@@ -265,10 +267,13 @@ def wrap_constrained_alg(
                     kl_rewards = -1 * self._kl_controller.kl_coeff * kl_div
 
                 # step into env to get rewards
+                pdb.set_trace()
                 actions = actions_tensor.cpu().numpy()
                 new_obs, task_rewards, dones, infos = self.env.step(actions)
-                constraint_rewards = np.stack([
-                    infos[env_ix]['constraint_reward'] for env_ix in range(self.env.num_envs)])
+                cnames = list(infos[0]["component_rewards"].keys())
+                constraint_rewards = [np.stack([
+                    infos[env_ix]['constraint_rewards'][k] for env_ix in range(self.env.num_envs)]) for k in cnames]
+                constraint_rewards = np.hstack(constraint_rewards)  # should be (n_envs, n_constraints)
 
                 self.num_timesteps += self.env.num_envs                
 
@@ -338,15 +343,16 @@ def wrap_constrained_alg(
                     # self.constraint_name)
 
             advantages_computed = False
+            component_reward_names = [
+                    k for k in list(episode_wise_transitions[0][0].info.keys()) if ("reward" in k and "constraint" not in k)]
+            n_component_rewards = len(component_reward_names)
+            n_constraint_rewards = len(self.reward_fn._constraint_names)
             for ep_ix, transitions in enumerate(episode_wise_transitions):
                 ep_length = len(transitions)
                 total_task_reward = 0.0
                 total_total_reward = 0.0
-                total_constraint_reward = 0.0
+                total_constraint_reward = np.zeros(n_constraint_rewards)
                 total_kl_reward = 0.0
-                component_reward_names = [
-                    k for k in list(episode_wise_transitions[ep_ix][0].info.keys()) if ("reward" in k and "constraint" not in k)]
-                n_component_rewards = len(component_reward_names)
                 total_component_rewards = dict(
                     zip(component_reward_names, [0.0] * n_component_rewards))
                 for transition_ix, transition in enumerate(transitions):
@@ -362,7 +368,8 @@ def wrap_constrained_alg(
                         transition.ref_log_prob
                     )
                     rollout_info["rollout_info/task_values"].append(transition.task_value.numpy())
-                    rollout_info["rollout_info/constraint_values"].append(transition.constraint_value.numpy())
+                    for i, cname in enumerate(self.reward_fn._constraint_names):
+                        rollout_info[f"rollout_info/constraint_values_{cname}"].append(transition.constraint_value.numpy()[..., i])
                     rollout_info["rollout_info/kl_values"].append(transition.kl_value.numpy())
 
                     if not rollout_buffer.full:
@@ -370,11 +377,11 @@ def wrap_constrained_alg(
                             transition.observation,
                             transition.action,
                             transition.total_reward,
-                            transition.constraint_reward,
+                            transition.constraint_reward,  # this is now a vector
                             transition.kl_reward,
                             transition.episode_start,
                             transition.task_value,
-                            transition.constraint_value,
+                            transition.constraint_value,  # this is now a vector
                             transition.kl_value,
                             transition.log_prob,
                             action_masks=transition.action_mask,
@@ -390,8 +397,8 @@ def wrap_constrained_alg(
                             rollout_buffer.task_rewards = (rollout_buffer.task_rewards - mean) / (
                                 std + 1e-8
                             )
-                            mean = rollout_buffer.constraint_rewards.mean()
-                            std = rollout_buffer.constraint_rewards.std()
+                            mean = rollout_buffer.constraint_rewards.mean(0)  # should be (n_constraints,)
+                            std = rollout_buffer.constraint_rewards.std(0)
                             rollout_buffer.constraint_rewards = (rollout_buffer.constraint_rewards - mean) / (
                                 std + 1e-8
                             )
@@ -412,7 +419,7 @@ def wrap_constrained_alg(
                         next_constraint_values = (
                             transitions[transition_ix + 1].constraint_value
                             if (transition_ix + 1) < ep_length
-                            else torch.tensor([0.0])
+                            else torch.tensor([0.0] * n_constraint_rewards)
                         )
                         next_kl_values = (
                             transitions[transition_ix + 1].kl_value
@@ -428,7 +435,7 @@ def wrap_constrained_alg(
                         next_ep_constraint_reward_togo = (
                             sum([transitions[ix].constraint_reward for ix in range(transition_ix+1, n_transitions)])
                             if (transition_ix + 1) < ep_length
-                            else np.array(0.0)
+                            else np.zeros(n_constraint_rewards)
                         )
                         next_ep_kl_reward_togo = (
                             sum([transitions[ix].kl_reward for ix in range(transition_ix+1, n_transitions)])
@@ -449,7 +456,9 @@ def wrap_constrained_alg(
                         advantages_computed = True
 
                 rollout_info["rollout_info/ep_task_rew"].append(total_task_reward)
-                rollout_info["rollout_info/ep_constraint_rew"].append(total_constraint_reward)
+                for i, cname in enumerate(self.reward_fn._constraint_names):
+                    rollout_info[f"rollout_info/ep_constraint_{cname}"].append(
+                        total_constraint_reward[..., i])
                 rollout_info["rollout_info/ep_total_rew"].append(total_total_reward)
                 rollout_info["rollout_info/ep_lens"].append(ep_length)
                 rollout_info["rollout_info/ep_kl_rew"].append(total_kl_reward)
@@ -482,7 +491,7 @@ def wrap_constrained_alg(
             # start the rollout process
             rollout_info = {
                 "rollout_info/ep_task_rew": [],
-                "rollout_info/ep_constraint_rew": [],
+                # "rollout_info/ep_constraint_rew": [],
                 "rollout_info/ep_total_rew": [],
                 "rollout_info/kl_div_mean": [],
                 "rollout_info/ep_lens": [],
@@ -493,6 +502,13 @@ def wrap_constrained_alg(
                 "rollout_info/constraint_values": [],
                 "rollout_info/kl_values": [],
             }
+            constraint_reward_names = list(
+                env.unwrapped.get_attr(
+                "reward_function", [0])[0].constraint_rewards.keys())
+            cname_dict = {
+                "rollout_info/ep_constraint_" + k: [] for k in constraint_reward_names}
+            rollout_info.update(cname_dict)
+
             component_reward_keys = list(
                 env.unwrapped.get_attr(
                 "reward_function", [0])[0].component_rewards.keys())

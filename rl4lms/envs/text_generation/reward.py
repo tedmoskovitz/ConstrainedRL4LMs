@@ -612,7 +612,7 @@ class IntentAccuracy(BatchedRewardFunction):
         shape: bool = True,
         intent_coeff: float = 1.0,
         auto_coeff: float = 1.0,
-        constraint_name: Optional[str] = None,
+        constraint_names: Optional[str] = None,
     ) -> None:
         super().__init__()
         self._metric = None
@@ -621,9 +621,10 @@ class IntentAccuracy(BatchedRewardFunction):
         self._auto_coeff = auto_coeff
         self._shaping_metric = MeteorMetric()
         # self.component_rewards = dict(meteor=None, intent=None)
-        if constraint_name is not None:
-            assert constraint_name in ["meteor", "intent"], "Invalid constraint name"
-        self._constraint_name = constraint_name
+        if constraint_names is not None:
+            for cname in constraint_names:
+                assert cname in ["meteor_reward", "intent_reward"], "Invalid constraint name"
+        self._constraint_names = constraint_names
         self.component_rewards = dict(intent_reward=0.0, meteor_reward=0.0)
 
     def __call__(
@@ -669,17 +670,16 @@ class IntentAccuracy(BatchedRewardFunction):
         rewards *= self._auto_coeff
         rewards[done_ixs] += self._intent_coeff * np.array(scores)
         intent_rewards = np.zeros_like(rewards)
-        intent_rewards[done_ixs] = np.array(scores)  * self._intent_coeff
+        intent_rewards[done_ixs] = np.array(scores) * self._intent_coeff
         # meteor_coeff = 1 if self._auto_coeff == 0 else 1 / self._auto_coeff    
         self.component_rewards = dict(
             meteor_reward=meteor_rewards, intent_reward=intent_rewards) #  * meteor_coeff
-        if self._constraint_name is not None:
-            if self._constraint_name == "meteor":
-                self.constraint_rewards = meteor_rewards.tolist()
-                # dict(meteor=meteor_rewards, intent=intent_rewards)
-                return intent_rewards.tolist()
-            self.constraint_rewards = intent_rewards.tolist()
-            return meteor_rewards.tolist()
+        if self._constraint_names is not None:
+            self.constraint_rewards = {}
+            for cname in self._constraint_names:
+                self.constraint_rewards = self.constraint_rewards.update(
+                    {cname: self.component_rewards[cname].tolist()})
+            return self.constraint_rewards
         return rewards.tolist()
 
 
