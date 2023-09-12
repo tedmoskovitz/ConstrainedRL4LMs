@@ -35,7 +35,7 @@ alg:
     verbose: 1
     learning_rate: 0.000001
     n_epochs: 5
-    sigmoid_lagrange: True  #False
+    squash_lagrange: True  #False
     lagrange_lr: 0.1
     fixed_lagrange: False #True
     # ========================== mu-PPO - KL ========================== 

@@ -110,12 +110,13 @@ class ConstrainedPPO(OnPolicyAlgorithm):
         device: Union[th.device, str] = "auto",
         _init_setup_model: bool = True,
         constraint_threshold: float = 0.1,
-        sigmoid_lagrange: bool = True,
+        squash_lagrange: bool = True,
         lagrange_lr: float = 1e-2,
         lagrange_init: Optional[float] = None,
         fixed_lagrange: bool = False,
         maximize_kl_reward: bool = True,
         task_threshold: float = 0.1,
+        equality_constraints: bool = False,
     ):
 
         super().__init__(
@@ -180,14 +181,24 @@ class ConstrainedPPO(OnPolicyAlgorithm):
         self.target_kl = target_kl
         self._tracker = tracker
         self.constraint_threshold = constraint_threshold
-        self.sigmoid_lagrange = sigmoid_lagrange
+        self.squash_lagrange = squash_lagrange
+        self.equality_constraints = equality_constraints
+        if self.squash_lagrange and self.equality_constraints:
+            self.squash_fn = th.tanh
+        else:
+            self.squash_fn = th.sigmoid
         if lagrange_init is None:
-            lagrange_init = 0.0 if sigmoid_lagrange else 0.5
+            if squash_lagrange and equality_constraints:
+                lagrange_init = 0.0
+            elif squash_lagrange:
+                lagrange_init = 0.5
+            else:
+                lagrange_init = 0.0
         if maximize_kl_reward:
             lagrange_init = [lagrange_init] * 2
         self.lagrange = th.tensor(
             lagrange_init, requires_grad=True, device=self.device, dtype=th.float32)
-        self.lagrange_optimizer = th.optim.SGD([self.lagrange], lr=lagrange_lr, momentum=0.2)
+        self.lagrange_optimizer = th.optim.SGD([self.lagrange], lr=lagrange_lr, momentum=0.1)
         self.fixed_lagrange = fixed_lagrange
         self.maximize_kl_reward = maximize_kl_reward
         self.task_threshold = task_threshold
@@ -266,15 +277,15 @@ class ConstrainedPPO(OnPolicyAlgorithm):
                     
                 # compute mixed advantages
                 if self.maximize_kl_reward:
-                    if self.sigmoid_lagrange:
-                        sig_lagrange = th.sigmoid(self.lagrange)
-                        mixed_advantages = (2 - sig_lagrange.sum()) * kl_advantages + sig_lagrange[0] * task_advantages + sig_lagrange[1] * constraint_advantages
+                    if self.squash_lagrange:
+                        lagrange = self.squash_fn(self.lagrange)
+                        mixed_advantages = (2 - lagrange.sum()) * kl_advantages + lagrange[0] * task_advantages + lagrange[1] * constraint_advantages
                     else:
                         mixed_advantages = kl_advantages * self.lagrange[0] * task_advantages + self.lagrange[1] * constraint_advantages
                 else:
-                    if self.sigmoid_lagrange:
-                        sig_lagrange = th.sigmoid(self.lagrange)
-                        mixed_advantages = (1 - sig_lagrange) * task_advantages + sig_lagrange * constraint_advantages
+                    if self.squash_lagrange:
+                        lagrange = self.squash_fn(self.lagrange)
+                        mixed_advantages = (1 - lagrange) * task_advantages + lagrange * constraint_advantages
                     else:
                         mixed_advantages = task_advantages + self.lagrange * constraint_advantages
 
@@ -345,13 +356,13 @@ class ConstrainedPPO(OnPolicyAlgorithm):
                     # task_violations = rollout_data.task_returns.mean() - self.task_threshold
                     task_violations = rollout_data.ep_task_reward_togo.mean() - self.task_threshold
                     # [n_constriants,]
-                    lagrange = th.sigmoid(self.lagrange) if self.sigmoid_lagrange else self.lagrange
+                    lagrange = self.squash_fn(self.lagrange) if self.squash_lagrange else self.lagrange
                     lagrange_loss = lagrange[0] * task_violations + lagrange[1] * constraint_violations
                 else:
                     actual_constraint_returns = rollout_data.constraint_returns - rollout_data.kl_returns
                     # constraint_violations = (actual_constraint_returns - self.constraint_threshold).mean()
                     constraint_violations = rollout_data.ep_constraint_reward_togo.mean() - self.constraint_threshold
-                    lagrange = th.sigmoid(self.lagrange) if self.sigmoid_lagrange else self.lagrange
+                    lagrange = self.squash_fn(self.lagrange) if self.squash_lagrange else self.lagrange
                     lagrange_loss = lagrange * constraint_violations
                     actual_constraint_returns_list.append(actual_constraint_returns.mean().item())
                 lagrange_losses.append(lagrange_loss.item())
@@ -388,11 +399,7 @@ class ConstrainedPPO(OnPolicyAlgorithm):
                     th.nn.utils.clip_grad_norm_(
                         [self.lagrange], self.max_grad_norm)
                     self.lagrange_optimizer.step()
-                    if self.sigmoid_lagrange:
-                        # do this to prevent entering into a region where gradient is ~zero
-                        self.lagrange.data = self.lagrange.data
-                        # self.lagrange.data = th.clamp(self.lagrange.data, min=-4.5, max=4.5)
-                    else:
+                    if not self.squash_lagrange and not self.equality_constraints:
                         self.lagrange.data = th.clamp(self.lagrange.data, min=0)
 
 
@@ -416,7 +423,7 @@ class ConstrainedPPO(OnPolicyAlgorithm):
         self.logger.record("train/loss", loss.item())
         self.logger.record("train/task_explained_variance", task_explained_var)
         self.logger.record("train/constraint_explained_variance", constraint_explained_var)
-        lagrange = th.sigmoid(self.lagrange) if self.sigmoid_lagrange else self.lagrange
+        lagrange = self.squash_fn(self.lagrange) if self.squash_lagrange else self.lagrange
         # self.logger.record("train/lagrange", lagrange.item())
         self.logger.record("train/lagrange_loss", np.mean(lagrange_losses))
         if hasattr(self.policy, "log_std"):
