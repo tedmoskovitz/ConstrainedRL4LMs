@@ -166,7 +166,7 @@ class ConstrainedRolloutBuffer(BaseBuffer):
         last_ep_constraint_reward_togo = last_ep_constraint_reward_togo  # .flatten()
         last_ep_kl_reward_togo = last_ep_kl_reward_togo  # .flatten()
 
-        last_gae_lam = 0
+        last_task_gae_lam, last_constraint_gae_lam, last_kl_gae_lam = 0, 0, 0
         for step in reversed(range(self.buffer_size)):
             if step == self.buffer_size - 1:
                 next_non_terminal = 1.0 - dones
@@ -190,9 +190,9 @@ class ConstrainedRolloutBuffer(BaseBuffer):
             constraint_delta = self.constraint_rewards[step] + self.gamma * next_constraint_values * next_non_terminal - self.constraint_values[step]
             kl_delta = self.kl_rewards[step] + self.gamma * next_kl_values * next_non_terminal - self.kl_values[step]
 
-            last_task_gae_lam = task_delta + self.gamma * self.gae_lambda * next_non_terminal * last_gae_lam
-            last_constraint_gae_lam = constraint_delta + self.gamma * self.gae_lambda * next_non_terminal * last_gae_lam
-            last_kl_gae_lam = kl_delta + self.gamma * self.gae_lambda * next_non_terminal * last_gae_lam
+            last_task_gae_lam = task_delta + self.gamma * self.gae_lambda * next_non_terminal * last_task_gae_lam
+            last_constraint_gae_lam = constraint_delta + self.gamma * self.gae_lambda * next_non_terminal * last_constraint_gae_lam
+            last_kl_gae_lam = kl_delta + self.gamma * self.gae_lambda * next_non_terminal * last_kl_gae_lam
 
             self.task_advantages[step] = last_task_gae_lam
             self.constraint_advantages[step] = last_constraint_gae_lam

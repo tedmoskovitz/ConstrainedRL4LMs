@@ -29,9 +29,9 @@ from rl4lms.envs.text_generation.warm_start import OnPolicyWarmStartMixin
 class ConstrainedTransitionInfo:
     observation: TensorDict
     action: np.ndarray
-    task_reward: np.ndarray
-    constraint_reward: np.ndarray
-    total_reward: np.ndarray  # task_reward + kl_reward
+    task_reward: np.ndarray  # may have kl_reward added depending on separate_kl arg
+    constraint_reward: np.ndarray  # may have kl_reward added depending on separate_kl arg
+    # total_reward: np.ndarray  # task_reward + kl_reward
     kl_div: np.ndarray
     episode_start: np.ndarray
     task_value: torch.Tensor
@@ -95,8 +95,8 @@ def compute_batched_rewards(
     # override the rewards in transitions
     kl_coeff = 0.0 if separate_kl_reward else 1.0
     for i, ((env_ix, trans_ix), (task_reward, constraint_reward)) in enumerate(zip(indices, all_rewards)):
-        episode_wise_transitions[env_ix][trans_ix].task_reward = task_reward
-        episode_wise_transitions[env_ix][trans_ix].total_reward = (
+        # episode_wise_transitions[env_ix][trans_ix].task_reward = task_reward
+        episode_wise_transitions[env_ix][trans_ix].task_reward = (
             task_reward + kl_coeff * episode_wise_transitions[env_ix][trans_ix].kl_reward
         )
         episode_wise_transitions[env_ix][trans_ix].constraint_reward = (
@@ -292,9 +292,9 @@ def wrap_constrained_alg(
                         transtion = ConstrainedTransitionInfo(
                             observation=unpacked_obs[env_ix],
                             action=actions[env_ix],
-                            task_reward=task_rewards[env_ix],
+                            task_reward=total_task_rewards[env_ix],
                             constraint_reward=total_constraint_rewards[env_ix],
-                            total_reward=total_task_rewards[env_ix],
+                            # total_reward=total_task_rewards[env_ix],
                             kl_div=kl_div.cpu().numpy()[env_ix],
                             episode_start=episode_starts[env_ix],
                             task_value=task_values[env_ix].cpu(),
@@ -341,7 +341,7 @@ def wrap_constrained_alg(
             for ep_ix, transitions in enumerate(episode_wise_transitions):
                 ep_length = len(transitions)
                 total_task_reward = 0.0
-                total_total_reward = 0.0
+                # total_total_reward = 0.0
                 total_constraint_reward = 0.0
                 total_kl_reward = 0.0
                 component_reward_names = [
@@ -352,7 +352,7 @@ def wrap_constrained_alg(
                 for transition_ix, transition in enumerate(transitions):
                     total_task_reward += transition.task_reward
                     total_constraint_reward += transition.constraint_reward
-                    total_total_reward += transition.total_reward
+                    # total_total_reward += transition.total_reward
                     total_kl_reward += transition.kl_reward
                     for k in total_component_rewards:
                         total_component_rewards[k] += transition.info[k]
@@ -369,7 +369,7 @@ def wrap_constrained_alg(
                         rollout_buffer.add(
                             transition.observation,
                             transition.action,
-                            transition.total_reward,
+                            transition.task_reward,
                             transition.constraint_reward,
                             transition.kl_reward,
                             transition.episode_start,
@@ -450,7 +450,7 @@ def wrap_constrained_alg(
 
                 rollout_info["rollout_info/ep_task_rew"].append(total_task_reward)
                 rollout_info["rollout_info/ep_constraint_rew"].append(total_constraint_reward)
-                rollout_info["rollout_info/ep_total_rew"].append(total_total_reward)
+                # rollout_info["rollout_info/ep_total_rew"].append(total_total_reward)
                 rollout_info["rollout_info/ep_lens"].append(ep_length)
                 rollout_info["rollout_info/ep_kl_rew"].append(total_kl_reward)
 
