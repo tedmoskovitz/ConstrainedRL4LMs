@@ -483,7 +483,7 @@ def wrap_constrained_alg(
             rollout_info = {
                 "rollout_info/ep_task_rew": [],
                 "rollout_info/ep_constraint_rew": [],
-                "rollout_info/ep_total_rew": [],
+                # "rollout_info/ep_total_rew": [],
                 "rollout_info/kl_div_mean": [],
                 "rollout_info/ep_lens": [],
                 "rollout_info/ep_kl_rew": [],
