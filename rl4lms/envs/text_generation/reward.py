@@ -683,6 +683,79 @@ class IntentAccuracy(BatchedRewardFunction):
         return rewards.tolist()
 
 
+class IntentAccuracyTargets(BatchedRewardFunction):
+    def __init__(
+        self,
+        shape: bool = True,
+        intent_coeff: float = 1.0,
+        auto_coeff: float = 1.0,
+        intent_target: float = 0.4,
+        meteor_target: float = 0.2, 
+    ) -> None:
+        super().__init__()
+        self._metric = None
+        self._shape = shape
+        self._intent_coeff = intent_coeff
+        self._auto_coeff = auto_coeff
+        self._intent_target = intent_target
+        self._meteor_target = meteor_target
+        self._shaping_metric = MeteorMetric()
+        self.component_rewards = dict(intent_reward=0.0, meteor_reward=0.0)
+
+    def __call__(
+        self,
+        prompt_texts: List[str],
+        gen_texts: List[str],
+        ref_texts: List[List[str]],
+        dones: List[bool],
+        meta_infos: List[Dict[str, Any]] = None,
+    ) -> List[float]:
+
+        if self._metric is None:
+            self._metric = IntentAccuracyDailyDialog()
+
+        # compute rewards for finished episodes only
+        meteor_rewards = np.zeros(len(gen_texts))
+
+        done_prompt_texts = []
+        done_gen_texts = []
+        done_ref_texts = []
+        done_meta_infos = []
+        done_ixs = []
+        for ix, (prompt, gen, ref, meta_info, done) in enumerate(
+            zip(prompt_texts, gen_texts, ref_texts, meta_infos, dones)
+        ):
+            if done:
+                done_prompt_texts.append(prompt)
+                done_gen_texts.append(gen)
+                done_ref_texts.append(ref)
+                done_meta_infos.append(meta_info)
+                done_ixs.append(ix)
+
+                if self._shape:
+                    score = self._shaping_metric.compute(
+                        done_prompt_texts, done_gen_texts, done_ref_texts
+                    )
+                    meteor_rewards[ix] = score["lexical/meteor"][1]
+
+        scores = self._metric.compute(
+            done_prompt_texts, done_gen_texts, done_ref_texts, done_meta_infos
+        )["intent/accuracy"][0]
+        meteor_rewards *= self._auto_coeff
+        intent_rewards = np.zeros_like(meteor_rewards)
+        intent_rewards[done_ixs] += self._intent_coeff * np.array(scores)
+        # meteor_coeff = 1 if self._auto_coeff == 0 else 1 / self._auto_coeff    
+        self.component_rewards = dict(
+            meteor_reward=meteor_rewards, intent_reward=intent_rewards) #  * meteor_coeff
+        
+        # rewards are negative total squared errors from targets
+        meteor_sqerr = (meteor_rewards - self._meteor_target) ** 2
+        intent_sqerr = (intent_rewards - self._intent_target) ** 2
+        rewards = -(meteor_sqerr + intent_sqerr)
+
+        return rewards.tolist()
+
+
 if __name__ == "__main__":
     predictions = "hello there general kenobi"
     references = ["hello there general kenobi", "hello there!!"]

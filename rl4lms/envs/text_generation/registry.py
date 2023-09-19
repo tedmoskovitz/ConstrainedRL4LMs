@@ -76,6 +76,7 @@ from rl4lms.envs.text_generation.reward import (
     SpiderRewardFunction,
     chrF,
     IntentAccuracy,
+    IntentAccuracyTargets,
 )
 from rl4lms.envs.text_generation.preference_reward import CommonGenPrefRM
 from rl4lms.envs.text_generation.test_datapool import TestTextGenPool
@@ -134,6 +135,7 @@ class RewardFunctionRegistry:
         "ter": TER,
         "chrf": chrF,
         "intent_accuracy": IntentAccuracy,
+        "intent_accuracy_targets": IntentAccuracyTargets,
         "common_gen_preference_model": CommonGenPrefRM,
     }
 
