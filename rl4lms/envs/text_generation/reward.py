@@ -749,9 +749,10 @@ class IntentAccuracyTargets(BatchedRewardFunction):
             meteor_reward=meteor_rewards, intent_reward=intent_rewards) #  * meteor_coeff
         
         # rewards are negative total squared errors from targets
-        meteor_sqerr = (meteor_rewards - self._meteor_target) ** 2
-        intent_sqerr = (intent_rewards - self._intent_target) ** 2
-        rewards = -(meteor_sqerr + intent_sqerr)
+        meteor_sqerr = (meteor_rewards[done_ixs] - self._meteor_target) ** 2
+        intent_sqerr = (intent_rewards[done_ixs] - self._intent_target) ** 2
+        rewards = np.zeros_like(meteor_rewards)
+        rewards[done_ixs] = -(meteor_sqerr + intent_sqerr)
 
         return rewards.tolist()
 
