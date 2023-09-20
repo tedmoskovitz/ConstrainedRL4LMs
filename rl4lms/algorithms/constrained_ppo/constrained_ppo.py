@@ -114,7 +114,8 @@ class ConstrainedPPO(OnPolicyAlgorithm):
         lagrange_lr: float = 1e-2,
         lagrange_init: Optional[float] = None,
         fixed_lagrange: bool = False,
-        maximize_kl_reward: bool = True,
+        # maximize_kl_reward: bool = True,
+        maximizing_reward: str = "kl",
         task_threshold: float = 0.1,
         equality_constraints: bool = False,
     ):
@@ -194,13 +195,18 @@ class ConstrainedPPO(OnPolicyAlgorithm):
                 lagrange_init = 0.5
             else:
                 lagrange_init = 0.0
-        if maximize_kl_reward:
+        self.maximizing_reward = maximizing_reward.lower()
+        if self.maximizing_reward not in ['kl', 'task', 'all']:
+            raise ValueError("maximizing_reward must be one of ['kl', 'task', 'all']")
+        
+        # if maximize_kl_reward:
+        if self.maximizing_reward in ['kl', 'all']:
             lagrange_init = [lagrange_init] * 2
         self.lagrange = th.tensor(
             lagrange_init, requires_grad=True, device=self.device, dtype=th.float32)
         self.lagrange_optimizer = th.optim.SGD([self.lagrange], lr=lagrange_lr, momentum=0.1)
         self.fixed_lagrange = fixed_lagrange
-        self.maximize_kl_reward = maximize_kl_reward
+        # self.maximize_kl_reward = maximize_kl_reward
         self.task_threshold = task_threshold
 
 
@@ -276,12 +282,23 @@ class ConstrainedPPO(OnPolicyAlgorithm):
                     
                     
                 # compute mixed advantages
-                if self.maximize_kl_reward:
+                # if self.maximize_kl_reward:
+                if self.maximizing_reward == 'kl':
                     if self.squash_lagrange:
                         lagrange = self.squash_fn(self.lagrange)
                         mixed_advantages = (2 - lagrange.sum()) * kl_advantages + lagrange[0] * task_advantages + lagrange[1] * constraint_advantages
                     else:
                         mixed_advantages = kl_advantages * self.lagrange[0] * task_advantages + self.lagrange[1] * constraint_advantages
+                elif self.maximizing_reward == 'all':
+                    if self.squash_lagrange:
+                        lagrange = self.squash_fn(self.lagrange)
+                        # task_only_advantages = task_advantages - kl_advantages
+                        # constraint_only_advantages = constraint_advantages - kl_advantages
+                        total_advantages = task_advantages + constraint_advantages
+                        mixed_advantages = (2 - lagrange.sum()) * total_advantages - lagrange[0] * task_advantages - lagrange[1] * constraint_advantages 
+                    else:
+                        total_advantages = task_advantages + constraint_advantages
+                        mixed_advantages = total_advantages - self.lagrange[0] * task_advantages - self.lagrange[1] * constraint_advantages
                 else:
                     if self.squash_lagrange:
                         lagrange = self.squash_fn(self.lagrange)
@@ -348,7 +365,8 @@ class ConstrainedPPO(OnPolicyAlgorithm):
                 # we need to cancel out the kl returns so that the constraint is only over the
                 # actual constraint reward function
                 # constraint_return = actual_constraint_return + kl_return
-                if self.maximize_kl_reward: # TODO: this is a hack, need to re-name/clean-up
+                # if self.maximize_kl_reward: # TODO: this is a hack, need to re-name/clean-up
+                if self.maximizing_reward == 'kl':
                     # [batch_size,]
                     # constraint_violations = rollout_data.constraint_returns.mean() - self.constraint_threshold
                     constraint_violations = rollout_data.ep_constraint_reward_togo.mean() - self.constraint_threshold
@@ -358,10 +376,18 @@ class ConstrainedPPO(OnPolicyAlgorithm):
                     # [n_constriants,]
                     lagrange = self.squash_fn(self.lagrange) if self.squash_lagrange else self.lagrange
                     lagrange_loss = lagrange[0] * task_violations + lagrange[1] * constraint_violations
+                elif self.maximizing_reward == 'all':
+                    actual_constraint_returns = rollout_data.ep_constraint_reward_togo - rollout_data.ep_kl_reward_togo
+                    actual_task_returns = rollout_data.ep_task_reward_togo - rollout_data.ep_kl_reward_togo
+                    constraint_violations = self.constraint_threshold - actual_constraint_returns.mean()
+                    task_violations = self.task_threshold - actual_task_returns.mean()
+                    lagrange = self.squash_fn(self.lagrange) if self.squash_lagrange else self.lagrange
+                    lagrange_loss = lagrange[0] * task_violations + lagrange[1] * constraint_violations
                 else:
                     actual_constraint_returns = rollout_data.constraint_returns - rollout_data.kl_returns
                     # constraint_violations = (actual_constraint_returns - self.constraint_threshold).mean()
-                    constraint_violations = rollout_data.ep_constraint_reward_togo.mean() - self.constraint_threshold
+                    # constraint_violations = rollout_data.ep_constraint_reward_togo.mean() - self.constraint_threshold
+                    constraint_violations = actual_constraint_returns.mean() - self.constraint_threshold
                     lagrange = self.squash_fn(self.lagrange) if self.squash_lagrange else self.lagrange
                     lagrange_loss = lagrange * constraint_violations
                     actual_constraint_returns_list.append(actual_constraint_returns.mean().item())
@@ -455,7 +481,8 @@ class ConstrainedPPO(OnPolicyAlgorithm):
             "ppo/ep_task_reward_togo": rollout_data.ep_task_reward_togo.mean().item(),
             "ppo/ep_kl_reward_togo": rollout_data.ep_kl_reward_togo.mean().item(),
         }
-        if self.maximize_kl_reward:
+        # if self.maximize_kl_reward:
+        if self.maximizing_reward in ['kl', 'all']:
             train_info.update({"ppo/task_lagrange": lagrange[0].item(),
                                "ppo/constraint_lagrange": lagrange[1].item(),
                                "ppo/task_violations": task_violations.item()})

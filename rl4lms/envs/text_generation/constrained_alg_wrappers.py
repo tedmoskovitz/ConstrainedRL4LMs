@@ -140,7 +140,8 @@ def wrap_constrained_alg(
                 n_envs=1,
             )
             self.reward_fn = self.env.get_attr("reward_function", 0)[0]
-            self.separate_kl_reward = "maximize_kl_reward" in alg_kwargs and alg_kwargs["maximize_kl_reward"]
+            # self.separate_kl_reward = "maximize_kl_reward" in alg_kwargs and alg_kwargs["maximize_kl_reward"]
+            self.separate_kl_reward = "maximizing_reward" in alg_kwargs and alg_kwargs["maximizing_reward"].lower() == 'kl'
 
         def get_policy_kwargs(
             self,
