@@ -242,6 +242,124 @@ class OnPolicyTrainer(TrainerWarmStartMixin):
                 self._alg.policy.get_language_model())
 
 
+class NelderMeadTrainer(TrainerWarmStartMixin):
+    """
+    A Nelder-Mead trainer for training LMs with onpolicy algorithms from SB3
+    """
+
+    def __init__(self,
+                 tokenizer_config: Dict[str, Any],
+                 datapool_config: Dict[str, Any],
+                 reward_config: Dict[str, Any],
+                 env_config: Dict[str, Any],
+                 on_policy_alg_config: Dict[str, Any],
+                 train_eval_config: Dict[str, Any],
+                 nelder_mead_config: Dict[str, Any],
+                 tracker: Tracker = None,
+                 experiment_name: str = '',
+                 disable_multiprocess: bool = False,
+                 seed: int = 0
+                 ):
+        self._tokenizer_config = tokenizer_config
+        self._datapool_config = datapool_config
+        self._reward_config = reward_config
+        self._env_config = env_config
+        self._on_policy_alg_config = on_policy_alg_config
+        self._train_eval_config = train_eval_config
+        self._nelder_mead_config = nelder_mead_config
+        self._tracker = tracker
+        self._experiment_name = experiment_name
+        self._seed = seed
+        self._disable_multiprocess = disable_multiprocess
+        self._setup()
+
+    def _setup(self):
+        # load trainer state from available previous checkpoint if available
+        self.load_trainer_state(self._tracker)
+        # set random seed
+        set_seed_everywhere(self._seed)
+
+        # build components
+        self._tokenizer = build_tokenizer(self._tokenizer_config)
+        self._reward_fn = build_reward_fn(self._reward_config)
+        self._metrics = build_metrics(
+            self._train_eval_config.get("metrics", []))
+        self._samples_by_split = build_datapool(
+            self._datapool_config)
+        self._env = build_env(self._env_config, self._reward_fn,
+                              self._tokenizer, self._samples_by_split["train"],
+                              multiprocess=not self._disable_multiprocess,)
+        self._alg = build_alg(self._on_policy_alg_config,
+                              self._env, self._tracker,
+                              self._policy_state_dict,
+                              self._alg_state_dict)
+
+        # extract train params
+        self._max_episode_length = self._env_config["args"]["max_episode_length"]
+        self._max_prompt_length = self._env_config["args"]["max_prompt_length"]
+        self._eval_batch_size = self._train_eval_config["eval_batch_size"]
+        self._n_iters = int(self._train_eval_config["n_iters"])
+        self._n_steps_per_iter = self._env.num_envs * self._alg.n_steps
+
+        # gen kwargs for evaluation (if it is different from rollout gen kwargs)
+        self._eval_gen_kwargs = self._train_eval_config.get(
+            "generation_kwargs", None)
+        
+
+    def _evaluate_on_datapools(self, epoch: int,
+                               splits: List[str] = ["val", "test"]):
+        split2metrics = {}
+        for split in splits:
+            metrics = evaluate_on_samples(policy=self._alg.policy,
+                                tokenizer=self._tokenizer,
+                                samples=self._samples_by_split[split],
+                                batch_size=self._eval_batch_size,
+                                max_prompt_length=self._max_prompt_length,
+                                metrics=self._metrics,
+                                epoch=epoch,
+                                split_name=split,
+                                tracker=self._tracker,
+                                gen_kwargs=self._eval_gen_kwargs)
+            split2metrics[split] = metrics
+
+        return self._compute_evaluation_score(split2metrics['test'])
+
+    def optimize_thresholds(self, thresholds: List[float]):
+        # train for given number of iters
+        iter_start = self._trainer_state["current_iter"]
+        task_threshold, constraint_threshold = thresholds
+        #TODO(CHECK THIS!)
+        self._alg.task_threshold = task_threshold
+        self._alg.constraint_threshold = constraint_threshold
+        for epoch in range(iter_start, self._n_iters):
+            # current state
+            self._trainer_state["current_iter"] = epoch
+
+            # inner rollout and learn loop for on-policy algorithm
+            self._alg.learn(self._n_steps_per_iter)
+
+            # evaluate on val set in the given intervals
+            if (epoch + 1) % self._train_eval_config["eval_every"] == 0:
+                self._evaluate_on_datapools(epoch=epoch)  #, splits=["val"])
+
+
+    def train_and_eval(self):
+        # evaluate on val and test set before fine-tuning once
+        iter_start = self._trainer_state["current_iter"]
+        self._evaluate_on_datapools(epoch=iter_start)
+
+
+        # finally evaluate on val and test samples
+        self._evaluate_on_datapools(epoch=epoch)
+
+        # save model here - we save only the language model
+        if self._tracker is not None:
+            self._tracker.save_auto_model(
+                self._alg.policy.get_language_model())
+
+
+
+
 class SupervisedTrainer:
     """
     A supervised trainer to train LMs (causal and seq2seq) on text generation tasks (wrapper on HF trainer)

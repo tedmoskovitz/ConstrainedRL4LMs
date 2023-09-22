@@ -96,6 +96,8 @@ def evaluate_on_samples(
         # log the corpus level scores
         tracker.log_metrics(epoch, split_name, corpus_level_metrics)
 
+    return corpus_level_metrics
+
 
 def generate_text(
     policy: BasePolicy,

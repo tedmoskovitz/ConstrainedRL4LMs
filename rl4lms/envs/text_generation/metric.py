@@ -125,6 +125,70 @@ class MeteorMetric(BaseMetric):
 
         metric_dict = {"lexical/meteor": (None, score)}
         return metric_dict
+    
+class CRLHFEvaluationMetric(BaseMetric):
+    def __init__(self) -> None:
+        super().__init__()
+        # lexical metrics
+        self._bleu_metric = BLEUMetric()
+        self._sacrebleu_metric = SacreBLEUMetric()
+        self._rouge_metric = RougeMetric()
+        # diversity metrics
+        self._diversity_metrics = DiversityMetrics()
+        self._diversity_metric_names = [
+            "max_pred_length-nopunct", "vocab_size-3-nopunct", "unique-3"]
+
+
+    def compute(
+        self,
+        prompt_texts: List[str],
+        generated_texts: List[str],
+        reference_texts: List[List[str]],
+        meta_infos: List[Dict[str, Any]] = None,
+        model: PreTrainedModel = None,
+        split_name: str = None,
+    ):
+        _MIN_BLEU, _MAX_BLEU = 0.0, 0.004676984628247904
+        _MIN_SACREBLEU, _MAX_SACREBLEU = 5.330883519077344e-06, 0.11063353821330388
+        _MIN_ROUGE2, _MAX_ROUGE2 = 0.0, 0.014568765083436451
+
+        _MIN_MAXPREDLENGTH, _MAX_MAXPREDLENGTH = 9, 183
+        _MIN_VOCABSIZE, _MAX_VOCABSIZE = 41, 32_227
+        _MIN_UNIQUE, _MAX_UNIQUE = 314, 36_880
+
+        args = [prompt_texts, generated_texts, reference_texts,]
+        kwargs = {"meta_infos": meta_infos, "model": model, "split_name": split_name,}
+        bleu_score = self._bleu_metric.compute(*args, **kwargs)["lexical/bleu"][1]
+        sacrebleu_score = self._sacrebleu_metric.compute(*args, **kwargs)["lexical/sacrebleu"][1]
+        rouge_score = self._rouge_metric.compute(*args, **kwargs)["lexical/rouge_rouge2"][1]
+        diversity_scores = self._diversity_metrics.compute(*args, **kwargs)
+        diversity_scores = {
+            k: v[1] for k, v in diversity_scores.items() if k in self._diversity_metric_names}
+        maxpredlength_score = diversity_scores["max_pred_length-nopunct"]
+        vocabsize_score = diversity_scores["vocab_size-3-nopunct"]
+        unique_score = diversity_scores["unique-3"]
+        
+        try:
+            # normalize
+            bleu_score = (bleu_score - _MIN_BLEU) / (_MAX_BLEU - _MIN_BLEU)
+            sacrebleu_score = (sacrebleu_score - _MIN_SACREBLEU) / (_MAX_SACREBLEU - _MIN_SACREBLEU)
+            rouge_score = (rouge_score - _MIN_ROUGE2) / (_MAX_ROUGE2 - _MIN_ROUGE2)
+            maxpredlength_score = (maxpredlength_score - _MIN_MAXPREDLENGTH) / (_MAX_MAXPREDLENGTH - _MIN_MAXPREDLENGTH)
+            vocabsize_score = (vocabsize_score - _MIN_VOCABSIZE) / (_MAX_VOCABSIZE - _MIN_VOCABSIZE)
+            unique_score = (unique_score - _MIN_UNIQUE) / (_MAX_UNIQUE - _MIN_UNIQUE)
+            # average lexical scores
+            lexical_score = (bleu_score + sacrebleu_score + rouge_score) / 3
+            # average diversity scores
+            diversity_score = (maxpredlength_score + vocabsize_score + unique_score) / 3
+            # average lexical and diversity together
+            crlhfeval_score = (lexical_score + diversity_score) / 2
+            # return
+            return {"lexical/CRLHFEval_Score": (None, crlhfeval_score)}
+        except:
+            return {"lexical/CRLHFEval_Score": (None, "n/a")}
+        
+
+
 
 
 class RougeMetric(BaseMetric):
