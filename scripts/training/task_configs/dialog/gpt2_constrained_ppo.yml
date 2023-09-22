@@ -102,6 +102,9 @@ train_evaluation:
     - id: sacre_bleu
       args:
         tokenize: "intl"
+    - id: crlhf_eval
+      args:
+        tokenize: "intl"
   generation_kwargs:
     do_sample: True
     top_k: 20

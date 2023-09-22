@@ -127,11 +127,11 @@ class MeteorMetric(BaseMetric):
         return metric_dict
     
 class CRLHFEvaluationMetric(BaseMetric):
-    def __init__(self) -> None:
+    def __init__(self, **args) -> None:
         super().__init__()
         # lexical metrics
         self._bleu_metric = BLEUMetric()
-        self._sacrebleu_metric = SacreBLEUMetric()
+        self._sacrebleu_metric = SacreBLEUMetric(**args)
         self._rouge_metric = RougeMetric()
         # diversity metrics
         self._diversity_metrics = DiversityMetrics()
