@@ -242,6 +242,37 @@ class OnPolicyTrainer(TrainerWarmStartMixin):
                 self._alg.policy.get_language_model())
 
 
+class NelderMeadFunc:
+    def __init__(self, func, tolerance=5e-3):
+        """A function class that caches previously computed values."""
+        self.func = func
+        self.threshold2eval_cache = {}
+        self.tolerance = tolerance
+
+    def find_nearby_key(self, x):
+        for key in self.threshold2eval_cache.keys():
+            existing_array = np.array(key)
+            if np.all(np.abs(existing_array - x) < self.tolerance):
+                return key
+        return None
+
+    def __call__(self, x):
+        # First try exact match
+        exact_key = tuple(x)
+        if exact_key in self.threshold2eval_cache:
+            return self.threshold2eval_cache[exact_key]
+
+        # Try approximate match
+        nearby_key = self.find_nearby_key(x)
+        if nearby_key is not None:
+            return self.threshold2eval_cache[nearby_key]
+
+        # Compute and cache if no match found
+        out = self.func(x)
+        self.threshold2eval_cache[exact_key] = out
+        return out
+
+
 class NelderMeadTrainer(TrainerWarmStartMixin):
     """
     A Nelder-Mead trainer for training LMs with onpolicy algorithms from SB3
@@ -391,19 +422,6 @@ class NelderMeadTrainer(TrainerWarmStartMixin):
 
         num_vars = simplex.shape[1]  # Number of variables (2 in this case)
         iterates = []
-        class NelderMeadFunc:
-
-            def __init__(self, func):
-                """A function class that caches previously computed values."""
-                self.func = func
-                self.threshold2eval_cache = {}
-
-            def __call__(self, x):
-                if tuple(x) in self.threshold2eval_cache:
-                    return self.threshold2eval_cache[tuple(x)]
-                out = self.func(x)
-                self.threshold2eval_cache[tuple(x)] = out
-                return out
 
         func = NelderMeadFunc(self.evaluate_thresholds)
 
