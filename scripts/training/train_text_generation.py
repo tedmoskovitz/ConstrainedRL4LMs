@@ -6,6 +6,7 @@ import yaml
 from rl4lms.envs.text_generation.logging_utils import Tracker
 from rl4lms.envs.text_generation.training_utils import (
     OnPolicyTrainer,
+    NelderMeadTrainer,
     SupervisedTrainer,
 )
 
@@ -43,6 +44,19 @@ def main(
             alg_config=config["alg"],
             train_eval_config=config["train_evaluation"],
             tracker=tracker,
+        )
+    elif config["nelder_mead"]["active"]:
+        trainer = NelderMeadTrainer(
+            tokenizer_config=config["tokenizer"],
+            datapool_config=config["datapool"],
+            reward_config=config["reward_fn"],
+            env_config=config["env"],
+            on_policy_alg_config=config["alg"],
+            train_eval_config=config["train_evaluation"],
+            nelder_mead_config=config["nelder_mead"],
+            tracker=tracker,
+            disable_multiprocess=disable_multiprocess,
+            seed=seed,
         )
     else:
         trainer = OnPolicyTrainer(

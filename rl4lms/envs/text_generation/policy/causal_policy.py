@@ -9,7 +9,7 @@ from stable_baselines3.common.distributions import CategoricalDistribution
 from stable_baselines3.common.type_aliases import Schedule, TensorDict
 from torch import nn
 from torch.distributions import Categorical
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, AutoConfig
 from transformers.modeling_utils import unwrap_model
 
 from rl4lms.algorithms.common.maskable.distributions import (
@@ -35,6 +35,38 @@ from rl4lms.envs.text_generation.warm_start import (
 )
 
 
+class DummyModel(nn.Module):
+    def __init__(self, model_name):
+        # Call the superclass constructor with dummy arguments
+        super().__init__() #None, None, None, model_name)
+
+        config = AutoConfig.from_pretrained(model_name)
+        hidden_size = config.hidden_size
+        self.linear = nn.Linear(hidden_size, hidden_size)
+        self.config = self._create_config(config)
+    
+    def _create_config(self, original_config):
+        class Config:
+            def __init__(self, original_config):
+                self.is_encoder_decoder = original_config.is_encoder_decoder
+                self.hidden_size = original_config.hidden_size
+                # ... (other attributes as needed)
+        return Config(original_config)
+    
+    def forward(self, *args, **kwargs):
+        # Simplified behavior for debugging
+        return self.linear(*args, **kwargs)
+
+    # Override other methods as needed for debugging
+    def _build_model_heads(self, model_name: str):
+        raise NotImplementedError
+    
+    def generate(self, *args, **kwargs):
+        raise NotImplementedError
+    
+
+
+
 class CausalLMActorCriticPolicy(LMActorCriticPolicy, ActorCriticWarmStartMixin):
     def __init__(
         self,
@@ -51,8 +83,10 @@ class CausalLMActorCriticPolicy(LMActorCriticPolicy, ActorCriticWarmStartMixin):
         prompt_truncation_side: str = "left",
         state_dict: Dict[str, Any] = None,
         num_value_heads: int = 1,
+        debug_mode: bool = False,
     ):
         assert num_value_heads <= 3, "Only 1-3 value heads are supported"
+        self._debug_mode = debug_mode
         super().__init__(
             observation_space,
             action_space,
@@ -70,23 +104,35 @@ class CausalLMActorCriticPolicy(LMActorCriticPolicy, ActorCriticWarmStartMixin):
         self.load_from_dict(state_dict)
 
     def _build_model_heads(self, model_name: str):
-        self._policy_model = AutoModelForCausalLM.from_pretrained(model_name)
-        self._policy_model.__class__ = override_generation_routines(
-            type(self._policy_model)
-        )
 
-        self._value_model = AutoModelForCausalLM.from_pretrained(model_name)
+        if self._debug_mode:
+            print("======================================")
+            print("=============Debug Mode===============")
+            print("======================================")
+            self._policy_model = DummyModel(model_name)
+            self._policy_model.__class__ = override_generation_routines(
+                type(self._policy_model)
+            )
+            self._value_model = DummyModel(model_name)
+        else:
+            self._policy_model = AutoModelForCausalLM.from_pretrained(model_name)
+            self._policy_model.__class__ = override_generation_routines(
+                type(self._policy_model)
+            )
+
+            self._value_model = AutoModelForCausalLM.from_pretrained(model_name)
+            # hidden_size = self._value_model.config.hidden_size
         self._ref_model = deepcopy(self._policy_model).eval()
 
         self._value_head = nn.Linear(
             self._value_model.config.hidden_size, self._num_value_heads, bias=False
-        )
-        # if self._num_value_heads > 1:
-        #     self._constraint_value_head = nn.Linear(
-        #         self._value_model.config.hidden_size, 1, bias=False
-        #     )
-        # else:
-        #     self._constraint_value_head = None
+            )  # self._value_model.config.
+            # if self._num_value_heads > 1:
+            #     self._constraint_value_head = nn.Linear(
+            #         self._value_model.config.hidden_size, 1, bias=False
+            #     )
+            # else:
+            #     self._constraint_value_head = None
 
         # apply model parallel
         if torch.cuda.is_available():
@@ -359,11 +405,13 @@ class MaskedCausalLMActorCriticPolicy(
         prompt_truncation_side: str = "left",
         state_dict: Dict[str, Any] = None,
         min_tokens_to_keep: int = 100,
+        debug_mode: bool = False,
     ):
         self.min_tokens_to_keep = min_tokens_to_keep
         self.mask_type = mask_type
         self.top_mask = top_mask if top_mask != -1 else self._action_space.n
         self.target_update_iterations = target_update_iterations
+        pdb.set_trace()
         super().__init__(
             observation_space,
             action_space,
@@ -377,6 +425,7 @@ class MaskedCausalLMActorCriticPolicy(
             generation_kwargs,
             prompt_truncation_side,
             state_dict,
+            debug_mode=debug_mode,
         )
 
         self._action_dist = MaskableCategoricalDistribution(self._action_space.n)

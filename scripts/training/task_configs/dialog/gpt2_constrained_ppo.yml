@@ -40,13 +40,13 @@ alg:
     fixed_lagrange: False #True
     # ========================== mu-PPO - KL ========================== 
     # constraint thresholds == intent threshold
-    constraint_threshold: 0.528 #0.432 #0.480  # 0.42  #0.354242 # 0.404242 # 0.0 #0.4642419712000001 # 0.0 #0.47569656313373887 #0.3  #-5.0  # 0.1 is trivial for meteor; 0.3 is trivial for intent, 0.4 is good for intent
+    constraint_threshold: 0.44 #0.432 #0.480  # 0.42  #0.354242 # 0.404242 # 0.0 #0.4642419712000001 # 0.0 #0.47569656313373887 #0.3  #-5.0  # 0.1 is trivial for meteor; 0.3 is trivial for intent, 0.4 is good for intent
     vf_coef: 0.5  #0.25  # usually 0.5
     constraint_vf_coef: 0.5  # 0.25
     kl_vf_coef: 0.2  # 0.1
     maximizing_reward: "kl" #maximize_kl_reward: True
     # task threshold == meteor threshold
-    task_threshold: 0.262 #0.214  # 0.238  # 0.2313443674991002  # -0.5 #0.22540687657414987 #0.1
+    task_threshold: 0.238 #0.214  # 0.238  # 0.2313443674991002  # -0.5 #0.22540687657414987 #0.1
     equality_constraints: True
     # we'll current consider "task" == METEOR, "constraint" == Intent
     # ========================== mu-PPO - METEOR ========================== 
@@ -71,11 +71,22 @@ alg:
       model_name: gpt2
       apply_model_parallel: True
       num_value_heads: 3
+      debug_mode: False
       generation_kwargs:
         do_sample: True
         top_k: 20
         min_length: 2
         max_new_tokens: 20
+
+nelder_mead:
+  active: True
+  args:
+    max_iters: 10
+    alpha: 1.0
+    gamma: 2.0
+    rho: 0.5
+    sigma: 0.5
+    tol: 0.01
       
 train_evaluation:
   eval_batch_size: 32

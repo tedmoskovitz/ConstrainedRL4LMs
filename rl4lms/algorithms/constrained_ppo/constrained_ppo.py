@@ -192,9 +192,9 @@ class ConstrainedPPO(OnPolicyAlgorithm):
             if squash_lagrange and equality_constraints:
                 lagrange_init = 0.0
             elif squash_lagrange:
-                lagrange_init = 0.5
-            else:
                 lagrange_init = 0.0
+            else:
+                lagrange_init = 0.5
         self.maximizing_reward = maximizing_reward.lower()
         if self.maximizing_reward not in ['kl', 'task', 'all']:
             raise ValueError("maximizing_reward must be one of ['kl', 'task', 'all']")

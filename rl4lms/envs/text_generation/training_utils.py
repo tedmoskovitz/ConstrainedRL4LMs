@@ -266,11 +266,12 @@ class NelderMeadTrainer(TrainerWarmStartMixin):
         self._env_config = env_config
         self._on_policy_alg_config = on_policy_alg_config
         self._train_eval_config = train_eval_config
-        self._nelder_mead_config = nelder_mead_config
+        self._nelder_mead_config = nelder_mead_config["args"]
         self._tracker = tracker
         self._experiment_name = experiment_name
         self._seed = seed
         self._disable_multiprocess = disable_multiprocess
+        self._num_evaluations = 0
         self._setup()
 
     def _setup(self):
@@ -306,7 +307,9 @@ class NelderMeadTrainer(TrainerWarmStartMixin):
             "generation_kwargs", None)
         
 
-    def _evaluate_on_datapools(self, epoch: int,
+    def _evaluate_on_datapools(self,
+                               epoch: int,
+                               increment_counter: bool = True,
                                splits: List[str] = ["val", "test"]):
         split2metrics = {}
         for split in splits:
@@ -322,12 +325,23 @@ class NelderMeadTrainer(TrainerWarmStartMixin):
                                 gen_kwargs=self._eval_gen_kwargs)
             split2metrics[split] = metrics
 
-        return self._compute_evaluation_score(split2metrics['test'])
+        self._tracker.log_metrics(
+            epoch, "test", {"num_evaluations": self._num_evaluations})
 
-    def optimize_thresholds(self, thresholds: List[float]):
+        out = {
+            "eval_score": split2metrics['test']["test/lexical/CRLHFEval_Score"],
+            "meteor": split2metrics['test']["test/lexical/meteor"],
+            "intent": split2metrics['test']["test/intent/accuracy"],
+        }
+
+        return out
+
+    def evaluate_thresholds(self, thresholds: np.ndarray) -> float:
         # train for given number of iters
         iter_start = self._trainer_state["current_iter"]
+        pdb.set_trace()
         task_threshold, constraint_threshold = thresholds
+        reached = lambda x, thresh: x >= 0.95 * thresh and x <= 1.05 * thresh
         #TODO(CHECK THIS!)
         self._alg.task_threshold = task_threshold
         self._alg.constraint_threshold = constraint_threshold
@@ -340,7 +354,22 @@ class NelderMeadTrainer(TrainerWarmStartMixin):
 
             # evaluate on val set in the given intervals
             if (epoch + 1) % self._train_eval_config["eval_every"] == 0:
-                self._evaluate_on_datapools(epoch=epoch)  #, splits=["val"])
+                scores = self._evaluate_on_datapools(
+                    epoch=epoch, increment_counter=False)
+                
+                if reached(scores['meteor'], task_threshold) and reached(scores['intent'], constraint_threshold):
+                    self._num_evaluations += 1
+                    self._tracker.log_metrics(
+                        epoch, "NelderMead", {"num_evaluations": self._num_evaluations})
+                    self._trainer_state["current_iter"] = epoch
+                    return scores['eval_score']
+
+        self._trainer_state["current_iter"] = epoch
+        if scores is not None:
+            return scores['eval_score']
+        return 0.0
+
+            
 
 
     def train_and_eval(self):
@@ -348,14 +377,78 @@ class NelderMeadTrainer(TrainerWarmStartMixin):
         iter_start = self._trainer_state["current_iter"]
         self._evaluate_on_datapools(epoch=iter_start)
 
+        # initialize simplex - 3 pairs of task and constraint thresholds
+        _METEOR_MIN, _METEOR_MAX = 0.00037604571643093187, 0.24810026760745868
+        _INTENT_MIN, _INTENT_MAX = 0.2504002561639449, 0.5283381364073007
+        _METEOR_MID = (_METEOR_MIN + _METEOR_MAX) / 2
+        _INTENT_MID = (_INTENT_MIN + _INTENT_MAX) / 2
+        _METEOR_RANGE = _METEOR_MAX - _METEOR_MIN
+        _INTENT_RANGE = _INTENT_MAX - _INTENT_MIN
+        simplex = np.array([
+            [_METEOR_MID + np.random.uniform(-0.1 * _METEOR_RANGE, 0.1 * _METEOR_RANGE),
+             _INTENT_MID + np.random.uniform(-0.1 * _INTENT_RANGE, 0.1 * _INTENT_RANGE)] for _ in range(3)])
+        
+
+        num_vars = simplex.shape[1]  # Number of variables (2 in this case)
+        iterates = []
+        func = self.evaluate_thresholds
+        for _ in range(self._nelder_mead_config['max_iters']):
+            iterates.append(simplex[-1])
+            # Order the simplex based on function values
+            simplex = sorted(simplex, key=func)
+            # log the current simplex
+            self._tracker.log_simplex(
+                self._trainer_state["current_iter"], "NelderMead", simplex.tolist())
+
+            # Compute the centroid of the n best points
+            centroid = np.mean(simplex[:-1], axis=0)
+
+            # Reflect the worst point
+            reflected = centroid + self._nelder_mead_config['alpha'] * (centroid - simplex[-1])
+            
+            if func(simplex[0]) <= func(reflected) < func(simplex[-2]):
+                simplex[-1] = reflected
+                
+                continue
+                
+
+            # Expand
+            if func(reflected) < func(simplex[0]):
+                expanded = centroid + self._nelder_mead_config['gamma'] * (reflected - centroid)                
+                if func(expanded) < func(simplex[0]):
+                    simplex[-1] = expanded
+                    continue
+                else:
+                    simplex[-1] = reflected
+                    continue
+            
+            # Contract
+            contracted = centroid + self._nelder_mead_config['rho'] * (simplex[-1] - centroid)
+            
+            if func(contracted) < func(simplex[-1]):
+                simplex[-1] = contracted
+                continue
+            
+            # Shrink
+            for i in range(1, num_vars + 1):
+                shrunk = simplex[0] + self._nelder_mead_config['sigma'] * (simplex[i] - simplex[0])
+                simplex[i] = shrunk
+            
+            # Check for convergence (using the standard deviation of function values)
+            if np.std([func(v) for v in simplex]) < self._nelder_mead_config['tol']:
+                break
+
+            if self._trainer_state["current_iter"] >= self._n_iters:
+                break
+
 
         # finally evaluate on val and test samples
+        epoch = self._trainer_state["current_iter"]
         self._evaluate_on_datapools(epoch=epoch)
+        # log final simplex
+        self._tracker.log_simplex(epoch, "NelderMead", simplex.tolist())
 
-        # save model here - we save only the language model
-        if self._tracker is not None:
-            self._tracker.save_auto_model(
-                self._alg.policy.get_language_model())
+
 
 
 

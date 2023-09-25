@@ -126,6 +126,7 @@ class MeteorMetric(BaseMetric):
         metric_dict = {"lexical/meteor": (None, score)}
         return metric_dict
     
+
 class CRLHFEvaluationMetric(BaseMetric):
     def __init__(self, **args) -> None:
         super().__init__()

@@ -65,6 +65,14 @@ class Tracker:
                 settings=wandb.Settings(code_dir=".")
             )
 
+    def log_simplex(self, epoch: int, split_name: str, simplex: List[List[float]]):
+        if self._wandb_log:
+            simplex_table = wandb.Table(
+                columns=["meteor_threshold", "intent_threshold"],
+                data=simplex)
+            self._wandb_run.log({
+                f"{split_name}_simplex-at-epoch{epoch}": simplex_table})
+
     def log_predictions(self, epoch: int,
                         split_name: str,
                         predictions: List[Dict]):
