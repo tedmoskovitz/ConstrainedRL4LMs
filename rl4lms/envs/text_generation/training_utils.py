@@ -391,7 +391,22 @@ class NelderMeadTrainer(TrainerWarmStartMixin):
 
         num_vars = simplex.shape[1]  # Number of variables (2 in this case)
         iterates = []
-        func = self.evaluate_thresholds
+        class NelderMeadFunc:
+
+            def __init__(self, func):
+                """A function class that caches previously computed values."""
+                self.func = func
+                self.threshold2eval_cache = {}
+
+            def __call__(self, x):
+                if tuple(x) in self.threshold2eval_cache:
+                    return self.threshold2eval_cache[tuple(x)]
+                out = self.func(x)
+                self.threshold2eval_cache[tuple(x)] = out
+                return out
+
+        func = NelderMeadFunc(self.evaluate_thresholds)
+
         for _ in range(self._nelder_mead_config['max_iters']):
             iterates.append(simplex[-1])
             # Order the simplex based on function values
