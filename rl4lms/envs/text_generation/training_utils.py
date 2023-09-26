@@ -375,7 +375,7 @@ class NelderMeadTrainer(TrainerWarmStartMixin):
         reached = lambda x, thresh: x >= 0.95 * thresh and x <= 1.05 * thresh
         self._alg.task_threshold = task_threshold
         self._alg.constraint_threshold = constraint_threshold
-        for epoch in range(iter_start, self._n_iters):
+        for epoch in range(iter_start, iter_start + self._n_iters // 10):
             # current state
             self._trainer_state["current_iter"] = epoch
 
@@ -393,6 +393,9 @@ class NelderMeadTrainer(TrainerWarmStartMixin):
                         epoch, "NelderMead", {"num_evaluations": self._num_evaluations})
                     self._trainer_state["current_iter"] = epoch
                     return scores['eval_score']
+                
+            if epoch >= self._n_iters - 1:
+                break
 
         self._trainer_state["current_iter"] = epoch
         if scores is not None:
@@ -414,9 +417,12 @@ class NelderMeadTrainer(TrainerWarmStartMixin):
         _INTENT_MID = (_INTENT_MIN + _INTENT_MAX) / 2
         _METEOR_RANGE = _METEOR_MAX - _METEOR_MIN
         _INTENT_RANGE = _INTENT_MAX - _INTENT_MIN
+        # simplex = np.array([
+        #     [_METEOR_MID + np.random.uniform(-0.1 * _METEOR_RANGE, 0.1 * _METEOR_RANGE),
+        #      _INTENT_MID + np.random.uniform(-0.1 * _INTENT_RANGE, 0.1 * _INTENT_RANGE)] for _ in range(3)])
         simplex = np.array([
-            [_METEOR_MID + np.random.uniform(-0.1 * _METEOR_RANGE, 0.1 * _METEOR_RANGE),
-             _INTENT_MID + np.random.uniform(-0.1 * _INTENT_RANGE, 0.1 * _INTENT_RANGE)] for _ in range(3)])
+            [0.21 + 0.02 * np.random.normal(),
+             0.41 + 0.02 * np.random.normal()] for _ in range(3)])
         
 
         num_vars = simplex.shape[1]  # Number of variables (2 in this case)
