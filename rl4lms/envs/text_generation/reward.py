@@ -125,7 +125,10 @@ class BatchedCommonGenPenaltyShapingFunction(BatchedRewardFunction):
 
 
 class MeteorRewardFunction(RewardFunction):
-    def __init__(self, shaping_fn: str = None) -> None:
+    def __init__(
+            self,
+            shaping_fn: str = None,
+            constraint_name: Optional[str] = None,) -> None:
         super().__init__()
         self._metric = MeteorMetric()
         from rl4lms.envs.text_generation.registry import RewardFunctionRegistry
@@ -135,6 +138,10 @@ class MeteorRewardFunction(RewardFunction):
             if shaping_fn is not None
             else shaping_fn
         )
+        if constraint_name is not None:
+            assert constraint_name in ["meteor", "parent"], "Invalid constraint name"
+        self._constraint_name = constraint_name
+        self.component_rewards = dict(parent_reward=0.0, meteor_reward=0.0)
 
     def __call__(
         self,
@@ -156,6 +163,15 @@ class MeteorRewardFunction(RewardFunction):
                 aux_score = self._shaping_fn(
                     current_observation, action, next_observation, done, meta_info
                 )
+                self.component_rewards = dict(
+                    meteor_reward=score, parent_reward=aux_score)
+                if self._constraint_name is not None:
+                    if self._constraint_name == "meteor":
+                        self.constraint_rewards = score
+                        # dict(meteor=meteor_rewards, intent=intent_rewards)
+                        return aux_score
+                    self.constraint_rewards = aux_score
+                    return score
                 score = score + aux_score
             return score
         return 0
