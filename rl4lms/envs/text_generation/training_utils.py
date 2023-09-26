@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 import torch
 import random
+import pdb
 
 from rl4lms.data_pools.text_generation_pool import Sample
 from rl4lms.envs.text_generation.env import TextGenEnv
@@ -359,6 +360,7 @@ class NelderMeadTrainer(TrainerWarmStartMixin):
         self._tracker.log_metrics(
             epoch, "test", {"num_evaluations": self._num_evaluations})
 
+        pdb.set_trace()
         out = {
             "eval_score": split2metrics['test']["test/lexical/CRLHFEval_Score"],
             "meteor": split2metrics['test']["test/lexical/meteor"],
