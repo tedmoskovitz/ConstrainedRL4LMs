@@ -434,6 +434,7 @@ class NelderMeadTrainer(TrainerWarmStartMixin):
             iterates.append(simplex[-1])
             # Order the simplex based on function values
             simplex = sorted(simplex, key=func)
+            simplex = np.array(simplex)
             # log the current simplex
             self._tracker.log_simplex(
                 self._trainer_state["current_iter"], "NelderMead", simplex.tolist())
