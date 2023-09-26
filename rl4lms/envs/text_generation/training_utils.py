@@ -360,7 +360,6 @@ class NelderMeadTrainer(TrainerWarmStartMixin):
         self._tracker.log_metrics(
             epoch, "test", {"num_evaluations": self._num_evaluations})
 
-        pdb.set_trace()
         out = {
             "eval_score": split2metrics['test']["lexical/CRLHFEval_Score"],
             "meteor": split2metrics['test']["lexical/meteor"],
