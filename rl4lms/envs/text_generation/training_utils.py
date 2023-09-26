@@ -372,10 +372,8 @@ class NelderMeadTrainer(TrainerWarmStartMixin):
     def evaluate_thresholds(self, thresholds: np.ndarray) -> float:
         # train for given number of iters
         iter_start = self._trainer_state["current_iter"]
-        pdb.set_trace()
         task_threshold, constraint_threshold = thresholds
         reached = lambda x, thresh: x >= 0.95 * thresh and x <= 1.05 * thresh
-        #TODO(CHECK THIS!)
         self._alg.task_threshold = task_threshold
         self._alg.constraint_threshold = constraint_threshold
         for epoch in range(iter_start, self._n_iters):
@@ -408,7 +406,7 @@ class NelderMeadTrainer(TrainerWarmStartMixin):
     def train_and_eval(self):
         # evaluate on val and test set before fine-tuning once
         iter_start = self._trainer_state["current_iter"]
-        # self._evaluate_on_datapools(epoch=iter_start)
+        self._evaluate_on_datapools(epoch=iter_start)  #TODO re-enable
 
         # initialize simplex - 3 pairs of task and constraint thresholds
         _METEOR_MIN, _METEOR_MAX = 0.00037604571643093187, 0.24810026760745868

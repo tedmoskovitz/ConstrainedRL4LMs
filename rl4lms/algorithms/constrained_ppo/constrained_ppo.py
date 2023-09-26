@@ -480,6 +480,8 @@ class ConstrainedPPO(OnPolicyAlgorithm):
             "ppo/ep_constraint_reward_togo": rollout_data.ep_constraint_reward_togo.mean().item(),
             "ppo/ep_task_reward_togo": rollout_data.ep_task_reward_togo.mean().item(),
             "ppo/ep_kl_reward_togo": rollout_data.ep_kl_reward_togo.mean().item(),
+            "ppo/task_threshold": self.task_threshold,
+            "ppo/constraint_threshold": self.constraint_threshold,
         }
         # if self.maximize_kl_reward:
         if self.maximizing_reward in ['kl', 'all']:
