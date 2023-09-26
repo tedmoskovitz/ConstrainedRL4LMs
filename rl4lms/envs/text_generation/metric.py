@@ -16,6 +16,7 @@ from rl4lms.data_pools.custom_text_generation_pools import DailyDialog
 from tqdm import tqdm
 import copy
 import rouge
+import pdb
 
 
 class BaseMetric:
@@ -165,6 +166,7 @@ class CRLHFEvaluationMetric(BaseMetric):
         diversity_scores = self._diversity_metrics.compute(*args, **kwargs)
         diversity_scores = {
             k: v[1] for k, v in diversity_scores.items() if k in self._diversity_metric_names}
+        pdb.set_trace()
         maxpredlength_score = diversity_scores["max_pred_length-nopunct"]
         vocabsize_score = diversity_scores["vocab_size-3-nopunct"]
         unique_score = diversity_scores["unique-3"]
