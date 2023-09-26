@@ -362,9 +362,9 @@ class NelderMeadTrainer(TrainerWarmStartMixin):
 
         pdb.set_trace()
         out = {
-            "eval_score": split2metrics['test']["test/lexical/CRLHFEval_Score"],
-            "meteor": split2metrics['test']["test/lexical/meteor"],
-            "intent": split2metrics['test']["test/intent/accuracy"],
+            "eval_score": split2metrics['test']["lexical/CRLHFEval_Score"],
+            "meteor": split2metrics['test']["lexical/meteor"],
+            "intent": split2metrics['test']["intent/accuracy"],
         }
 
         return out
@@ -408,7 +408,7 @@ class NelderMeadTrainer(TrainerWarmStartMixin):
     def train_and_eval(self):
         # evaluate on val and test set before fine-tuning once
         iter_start = self._trainer_state["current_iter"]
-        self._evaluate_on_datapools(epoch=iter_start)
+        # self._evaluate_on_datapools(epoch=iter_start)
 
         # initialize simplex - 3 pairs of task and constraint thresholds
         _METEOR_MIN, _METEOR_MAX = 0.00037604571643093187, 0.24810026760745868
