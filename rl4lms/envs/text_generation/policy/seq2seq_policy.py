@@ -47,6 +47,7 @@ class Seq2SeqLMActorCriticPolicy(LMActorCriticPolicy, ActorCriticWarmStartMixin)
         generation_kwargs: Dict[str, Any] = {},
         prompt_truncation_side: str = "left",
         state_dict: Dict[str, Any] = None,
+        num_value_heads: int = 1,
     ):
         super().__init__(
             observation_space,
@@ -60,6 +61,7 @@ class Seq2SeqLMActorCriticPolicy(LMActorCriticPolicy, ActorCriticWarmStartMixin)
             optimizer_class,
             generation_kwargs,
             prompt_truncation_side,
+            num_value_heads,
         )
         self.load_from_dict(state_dict)
 
@@ -73,7 +75,7 @@ class Seq2SeqLMActorCriticPolicy(LMActorCriticPolicy, ActorCriticWarmStartMixin)
         self._ref_model = deepcopy(self._policy_model).eval()
 
         self._value_head = nn.Linear(
-            self._value_model.config.hidden_size, 1, bias=False
+            self._value_model.config.hidden_size, self._num_value_heads, bias=False
         )
 
         # apply model parallel
