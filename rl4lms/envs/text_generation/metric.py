@@ -138,7 +138,9 @@ class CRLHFEvaluationMetric(BaseMetric):
         # diversity metrics
         self._diversity_metrics = DiversityMetrics()
         self._diversity_metric_names = [
-            "max_pred_length-nopunct", "vocab_size-3-nopunct", "unique-3"]
+            "diversity_metrics/max_pred_length-nopunct",
+            "diversity_metrics/vocab_size-3-nopunct",
+            "diversity_metrics/unique-3"]
 
 
     def compute(
@@ -164,12 +166,11 @@ class CRLHFEvaluationMetric(BaseMetric):
         sacrebleu_score = self._sacrebleu_metric.compute(*args, **kwargs)["lexical/sacrebleu"][1]
         rouge_score = self._rouge_metric.compute(*args, **kwargs)["lexical/rouge_rouge2"][1]
         diversity_scores = self._diversity_metrics.compute(*args, **kwargs)
-        pdb.set_trace()
         diversity_scores = {
             k: v[1] for k, v in diversity_scores.items() if k in self._diversity_metric_names}
-        maxpredlength_score = diversity_scores["max_pred_length-nopunct"]
-        vocabsize_score = diversity_scores["vocab_size-3-nopunct"]
-        unique_score = diversity_scores["unique-3"]
+        maxpredlength_score = diversity_scores["diversity_metrics/max_pred_length-nopunct"]
+        vocabsize_score = diversity_scores["diversity_metrics/vocab_size-3-nopunct"]
+        unique_score = diversity_scores["diversity_metrics/unique-3"]
         
         try:
             # normalize
