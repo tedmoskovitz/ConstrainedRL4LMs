@@ -421,7 +421,7 @@ class NelderMeadTrainer(TrainerWarmStartMixin):
         #     [_METEOR_MID + np.random.uniform(-0.1 * _METEOR_RANGE, 0.1 * _METEOR_RANGE),
         #      _INTENT_MID + np.random.uniform(-0.1 * _INTENT_RANGE, 0.1 * _INTENT_RANGE)] for _ in range(3)])
         simplex = np.array([
-            [0.20 + 0.02 * np.random.uniform(),
+            [0.20 + 0.03 * np.random.uniform(),
              0.44 + 0.03 * np.random.uniform()] for _ in range(3)])
         
 
