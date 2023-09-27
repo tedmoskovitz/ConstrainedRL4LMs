@@ -422,7 +422,7 @@ class NelderMeadTrainer(TrainerWarmStartMixin):
         #      _INTENT_MID + np.random.uniform(-0.1 * _INTENT_RANGE, 0.1 * _INTENT_RANGE)] for _ in range(3)])
         simplex = np.array([
             [0.21 + 0.02 * np.random.normal(),
-             0.41 + 0.02 * np.random.normal()] for _ in range(3)])
+             0.41 + 0.03 * np.random.normal()] for _ in range(3)])
         
 
         num_vars = simplex.shape[1]  # Number of variables (2 in this case)
@@ -435,6 +435,8 @@ class NelderMeadTrainer(TrainerWarmStartMixin):
             # Order the simplex based on function values
             simplex = sorted(simplex, key=func)
             simplex = np.array(simplex)
+            simplex[:, 0] = np.clip(simplex[:, 0], _METEOR_MIN, _METEOR_MAX)
+            simplex[:, 1] = np.clip(simplex[:, 1], _INTENT_MIN, _INTENT_MAX)
             # log the current simplex
             self._tracker.log_simplex(
                 self._trainer_state["current_iter"], "NelderMead", simplex.tolist())
