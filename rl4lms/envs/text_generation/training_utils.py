@@ -392,14 +392,14 @@ class NelderMeadTrainer(TrainerWarmStartMixin):
                     self._tracker.log_metrics(
                         epoch, "NelderMead", {"num_evaluations": self._num_evaluations})
                     self._trainer_state["current_iter"] = epoch
-                    return scores['eval_score']
+                    return -scores['eval_score']
                 
             if epoch >= self._n_iters - 1:
                 break
 
         self._trainer_state["current_iter"] = epoch
         if scores is not None:
-            return scores['eval_score']
+            return -scores['eval_score']
         return 0.0
 
             
@@ -430,7 +430,8 @@ class NelderMeadTrainer(TrainerWarmStartMixin):
 
         func = NelderMeadFunc(self.evaluate_thresholds)
 
-        for _ in range(self._nelder_mead_config['max_iters']):
+        # for _ in range(self._nelder_mead_config['max_iters']):
+        while self._trainer_state["current_iter"] < self._n_iters:
             iterates.append(simplex[-1])
             # Order the simplex based on function values
             simplex = sorted(simplex, key=func)
@@ -476,11 +477,11 @@ class NelderMeadTrainer(TrainerWarmStartMixin):
                 simplex[i] = shrunk
             
             # Check for convergence (using the standard deviation of function values)
-            if np.std([func(v) for v in simplex]) < self._nelder_mead_config['tol']:
-                break
+            # if np.std([func(v) for v in simplex]) < self._nelder_mead_config['tol']:
+            #     break
 
-            if self._trainer_state["current_iter"] >= self._n_iters:
-                break
+            # if self._trainer_state["current_iter"] >= self._n_iters:
+            #     break
 
 
         # finally evaluate on val and test samples
