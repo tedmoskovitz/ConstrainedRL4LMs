@@ -493,7 +493,7 @@ class NelderMeadTrainer(TrainerWarmStartMixin):
         epoch = self._trainer_state["current_iter"]
         self._evaluate_on_datapools(epoch=epoch)
         # log final simplex
-        self._tracker.log_simplex(epoch, "NelderMead", simplex.tolist(), best_val)
+        self._tracker.log_simplex(epoch, "NelderMead", simplex.tolist())
 
 
 
