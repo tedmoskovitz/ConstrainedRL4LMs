@@ -375,7 +375,7 @@ class NelderMeadTrainer(TrainerWarmStartMixin):
         reached = lambda x, thresh: x >= 0.95 * thresh and x <= 1.05 * thresh
         self._alg.task_threshold = task_threshold
         self._alg.constraint_threshold = constraint_threshold
-        for epoch in range(iter_start, iter_start + self._n_iters // 8):
+        for epoch in range(iter_start, iter_start + self._n_iters // 10):
             # current state
             self._trainer_state["current_iter"] = epoch
 
