@@ -375,7 +375,7 @@ class NelderMeadTrainer(TrainerWarmStartMixin):
         reached = lambda x, thresh: x >= 0.95 * thresh and x <= 1.05 * thresh
         self._alg.task_threshold = task_threshold
         self._alg.constraint_threshold = constraint_threshold
-        for epoch in range(iter_start, iter_start + self._n_iters // 5):
+        for epoch in range(iter_start, iter_start + self._n_iters // 8):
             # current state
             self._trainer_state["current_iter"] = epoch
 
@@ -394,9 +394,10 @@ class NelderMeadTrainer(TrainerWarmStartMixin):
                     self._trainer_state["current_iter"] = epoch
                     return -scores['eval_score']
                 
-            if epoch >= self._n_iters - 1:
+            if epoch >= iter_start + self._n_iters - 1:
                 break
 
+        
         self._trainer_state["current_iter"] = epoch
         if scores is not None:
             return -scores['eval_score']
@@ -421,8 +422,8 @@ class NelderMeadTrainer(TrainerWarmStartMixin):
         #     [_METEOR_MID + np.random.uniform(-0.1 * _METEOR_RANGE, 0.1 * _METEOR_RANGE),
         #      _INTENT_MID + np.random.uniform(-0.1 * _INTENT_RANGE, 0.1 * _INTENT_RANGE)] for _ in range(3)])
         simplex = np.array([
-            [0.20 + 0.03 * np.random.uniform(),
-             0.44 + 0.03 * np.random.uniform()] for _ in range(3)])
+            [0.20 + 0.05 * np.random.uniform(),
+             0.43 + 0.07 * np.random.uniform()] for _ in range(3)])
         
 
         num_vars = simplex.shape[1]  # Number of variables (2 in this case)
@@ -436,8 +437,12 @@ class NelderMeadTrainer(TrainerWarmStartMixin):
             # Order the simplex based on function values
             simplex = sorted(simplex, key=func)
             simplex = np.array(simplex)
-            simplex[:, 0] = np.clip(simplex[:, 0], 0.2, _METEOR_MAX)
-            simplex[:, 1] = np.clip(simplex[:, 1], 0.44, _INTENT_MAX)
+            best_val = func(simplex[0])
+            self._tracker.log_metrics(
+                self._trainer_state["current_iter"], "NelderMead",
+                {"best_val": best_val})
+            # simplex[:, 0] = np.clip(simplex[:, 0], _METEOR_MID, _METEOR_MAX)
+            # simplex[:, 1] = np.clip(simplex[:, 1], _INTENT_MID, _INTENT_MAX)
             # log the current simplex
             self._tracker.log_simplex(
                 self._trainer_state["current_iter"], "NelderMead", simplex.tolist())
@@ -447,10 +452,6 @@ class NelderMeadTrainer(TrainerWarmStartMixin):
 
             # Reflect the worst point
             reflected = centroid + self._nelder_mead_config['alpha'] * (centroid - simplex[-1])
-            best_val = func(simplex[0])
-            self._tracker.log_metrics(
-                self._trainer_state["current_iter"], "NelderMead",
-                {"best_val": best_val})
             
             if best_val <= func(reflected) < func(simplex[-2]):
                 simplex[-1] = reflected
@@ -481,8 +482,8 @@ class NelderMeadTrainer(TrainerWarmStartMixin):
                 simplex[i] = shrunk
             
             # Check for convergence (using the standard deviation of function values)
-            # if np.std([func(v) for v in simplex]) < self._nelder_mead_config['tol']:
-            #     break
+            if np.std([func(v) for v in simplex]) < self._nelder_mead_config['tol']:
+                break
 
             # if self._trainer_state["current_iter"] >= self._n_iters:
             #     break
