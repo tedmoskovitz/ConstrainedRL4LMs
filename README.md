@@ -1,18 +1,16 @@
-<p align="center">
-  <img src="RL4LMs_logo.png" width=512px>
-</p>
 
-<h1 align="center"> :robot: RL4LMs :rocket: </h1>
+This codebase contains the implementation of constrained RLHF for the paper "Confronting Reward Model Overoptimization with Constrained RLHF". 
 
-<h3 align="center"> A modular RL library to fine-tune language models to human preferences </h3>
+It is based on the public repository RL4LMs: https://github.com/allenai/RL4LMs. 
 
-<br>
+Constrained approaches can be run via the command:
+```
+python scripts/training/train_text_generation.py --config_path scripts/training/task_configs/dialog/gpt2_constrained_ppo.yml --log_to_wandb --seed=0 --experiment_name=<exp_name>
+```
 
-We provide easily customizable building blocks for training language models including implementations of **on-policy algorithms**, **reward functions**, **metrics**, **datasets** and **LM based actor-critic policies**
+We copy the general descrption of the repository structure below:
 
-Paper Link: https://arxiv.org/abs/2210.01241
-
-Website Link: https://rl4lms.apps.allenai.org/
+------------------------------
 
 Thoroughly **tested** and **benchmarked** with over **2000 experiments** :fire: (GRUE benchmark :trophy:) on a comprehensive set of: 
 - 7 different Natural Language Processing (NLP) Tasks:
