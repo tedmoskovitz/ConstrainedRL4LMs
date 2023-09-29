@@ -114,7 +114,6 @@ class ConstrainedPPO(OnPolicyAlgorithm):
         lagrange_lr: float = 1e-2,
         lagrange_init: Optional[float] = None,
         fixed_lagrange: bool = False,
-        # maximize_kl_reward: bool = True,
         maximizing_reward: str = "kl",
         task_threshold: float = 0.1,
         equality_constraints: bool = False,
@@ -199,14 +198,12 @@ class ConstrainedPPO(OnPolicyAlgorithm):
         if self.maximizing_reward not in ['kl', 'task', 'all']:
             raise ValueError("maximizing_reward must be one of ['kl', 'task', 'all']")
         
-        # if maximize_kl_reward:
         if self.maximizing_reward in ['kl', 'all']:
             lagrange_init = [lagrange_init] * 2
         self.lagrange = th.tensor(
             lagrange_init, requires_grad=True, device=self.device, dtype=th.float32)
         self.lagrange_optimizer = th.optim.SGD([self.lagrange], lr=lagrange_lr, momentum=0.1)
         self.fixed_lagrange = fixed_lagrange
-        # self.maximize_kl_reward = maximize_kl_reward
         self.task_threshold = task_threshold
 
 
@@ -252,7 +249,6 @@ class ConstrainedPPO(OnPolicyAlgorithm):
             approx_kl_divs = []
             # Do a complete pass on the rollout buffer
             for batch_ix, rollout_data in enumerate(list(self.rollout_buffer.get(self.batch_size))):
-                # self.verify_rollout_data(rollout_data)
                 actions = rollout_data.actions
                 if isinstance(self.action_space, spaces.Discrete):
                     # Convert discrete action from float to long
@@ -282,7 +278,6 @@ class ConstrainedPPO(OnPolicyAlgorithm):
                     
                     
                 # compute mixed advantages
-                # if self.maximize_kl_reward:
                 if self.maximizing_reward == 'kl':
                     if self.squash_lagrange:
                         lagrange = self.squash_fn(self.lagrange)
@@ -292,8 +287,6 @@ class ConstrainedPPO(OnPolicyAlgorithm):
                 elif self.maximizing_reward == 'all':
                     if self.squash_lagrange:
                         lagrange = self.squash_fn(self.lagrange)
-                        # task_only_advantages = task_advantages - kl_advantages
-                        # constraint_only_advantages = constraint_advantages - kl_advantages
                         total_advantages = task_advantages + constraint_advantages
                         mixed_advantages = (2 - lagrange.sum()) * total_advantages - lagrange[0] * task_advantages - lagrange[1] * constraint_advantages 
                     else:
@@ -329,7 +322,6 @@ class ConstrainedPPO(OnPolicyAlgorithm):
                     kl_values_pred = kl_values
                 else:
                     # Clip the different between old and new value
-                    # NOTE: this depends on the reward scaling
                     task_values_pred = rollout_data.old_task_values + th.clamp(
                         task_values - rollout_data.old_task_values, -clip_range_vf, clip_range_vf
                     )
@@ -360,18 +352,14 @@ class ConstrainedPPO(OnPolicyAlgorithm):
 
                 loss = policy_loss + self.ent_coef * entropy_loss + value_loss
 
-                # compute lagrange multiplier loss  # TODO: see if it works better with 
-                # constraint returns instead of value estimates
                 # we need to cancel out the kl returns so that the constraint is only over the
                 # actual constraint reward function
                 # constraint_return = actual_constraint_return + kl_return
                 # if self.maximize_kl_reward: # TODO: this is a hack, need to re-name/clean-up
                 if self.maximizing_reward == 'kl':
                     # [batch_size,]
-                    # constraint_violations = rollout_data.constraint_returns.mean() - self.constraint_threshold
                     constraint_violations = rollout_data.ep_constraint_reward_togo.mean() - self.constraint_threshold
                     # [batch_size,]
-                    # task_violations = rollout_data.task_returns.mean() - self.task_threshold
                     task_violations = rollout_data.ep_task_reward_togo.mean() - self.task_threshold
                     # [n_constriants,]
                     lagrange = self.squash_fn(self.lagrange) if self.squash_lagrange else self.lagrange
@@ -385,8 +373,6 @@ class ConstrainedPPO(OnPolicyAlgorithm):
                     lagrange_loss = lagrange[0] * task_violations + lagrange[1] * constraint_violations
                 else:
                     actual_constraint_returns = rollout_data.constraint_returns - rollout_data.kl_returns
-                    # constraint_violations = (actual_constraint_returns - self.constraint_threshold).mean()
-                    # constraint_violations = rollout_data.ep_constraint_reward_togo.mean() - self.constraint_threshold
                     constraint_violations = actual_constraint_returns.mean() - self.constraint_threshold
                     lagrange = self.squash_fn(self.lagrange) if self.squash_lagrange else self.lagrange
                     lagrange_loss = lagrange * constraint_violations
