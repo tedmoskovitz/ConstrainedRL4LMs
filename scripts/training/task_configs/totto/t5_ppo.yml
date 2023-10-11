@@ -5,14 +5,14 @@ tokenizer:
   pad_token_as_eos_token: False 
 
 reward_fn:
+  # id: meteor
+  # - id: parent
+  # - id: meteor
   id: meteor
-    # - id: parent
-    # - id: meteor
-    # - id: meteor
-    #   args:
-    #     shaping_fn: "parent"
-    # - id: bleu
-    # - id: sacre_bleu
+    args:
+      shaping_fn: "parent"
+  # - id: bleu
+  # - id: sacre_bleu
 
 datapool:
   id: totto
