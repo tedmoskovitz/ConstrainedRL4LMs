@@ -9,8 +9,8 @@ reward_fn:
   # - id: parent
   # - id: meteor
   id: meteor
-    args:
-      shaping_fn: "parent"
+  args:
+    shaping_fn: "parent"
   # - id: bleu
   # - id: sacre_bleu
 
