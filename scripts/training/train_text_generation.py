@@ -45,7 +45,7 @@ def main(
             train_eval_config=config["train_evaluation"],
             tracker=tracker,
         )
-    elif config["nelder_mead"]["active"]:
+    elif "nelder_mead" in config and config["nelder_mead"]["active"]:
         trainer = NelderMeadTrainer(
             tokenizer_config=config["tokenizer"],
             datapool_config=config["datapool"],
