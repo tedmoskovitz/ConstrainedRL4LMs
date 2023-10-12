@@ -1,5 +1,5 @@
 tokenizer:
-  model_name: t5-base
+  model_name: t5-small  # base
   padding_side: left
   truncation_side: right
   pad_token_as_eos_token: False 
@@ -43,7 +43,7 @@ alg:
   policy:
     id: seq2seq_lm_actor_critic_policy
     args:
-      model_name: t5-base
+      model_name: t5-small  # base
       apply_model_parallel: True
       generation_kwargs:
         do_sample: True
