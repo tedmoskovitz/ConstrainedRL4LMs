@@ -21,7 +21,7 @@ datapool:
 
 
 env:
-  n_envs: 10
+  n_envs: 2 # 10
   args:
     max_prompt_length: 512
     max_episode_length: 50
@@ -33,7 +33,7 @@ alg:
   id: ppo
   args:
     n_steps: 256
-    batch_size: 64
+    batch_size: 2 # 64
     verbose: 1
     learning_rate: 0.000002
     n_epochs: 5
@@ -52,7 +52,7 @@ alg:
         max_new_tokens: 50
     
 train_evaluation:
-  eval_batch_size: 100
+  eval_batch_size: 2 # 100
   n_iters: 100
   eval_every: 20
   save_every: 1
