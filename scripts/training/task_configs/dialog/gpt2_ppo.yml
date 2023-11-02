@@ -5,12 +5,13 @@ tokenizer:
   pad_token_as_eos_token: True
 
 reward_fn:
-  id: "intent_accuracy_targets"  # "intent_accuracy"
+  id: "intent_accuracy" #  "intent_accuracy_targets" (this is PPO-SAT) 
   args:
     intent_coeff: 1.0  # 0.75
     auto_coeff: 1.0 # 0.25
-    intent_target: 0.47
-    meteor_target: 0.23
+    bleu_coeff: 1.0
+    # intent_target: 0.47
+    # meteor_target: 0.23
 
 
 datapool:

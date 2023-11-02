@@ -628,7 +628,8 @@ class IntentAccuracy(BatchedRewardFunction):
         shape: bool = True,
         intent_coeff: float = 1.0,
         auto_coeff: float = 1.0,
-        constraint_name: Optional[str] = None,
+        bleu_coeff: Optional[float] = None,
+        constraint_names: Optional[List[str]] = None,
     ) -> None:
         super().__init__()
         self._metric = None
@@ -636,11 +637,17 @@ class IntentAccuracy(BatchedRewardFunction):
         self._intent_coeff = intent_coeff
         self._auto_coeff = auto_coeff
         self._shaping_metric = MeteorMetric()
+        self._bleu = BLEUMetric() if bleu_coeff else None
+        self._bleu_coeff = bleu_coeff
         # self.component_rewards = dict(meteor=None, intent=None)
-        if constraint_name is not None:
-            assert constraint_name in ["meteor", "intent"], "Invalid constraint name"
-        self._constraint_name = constraint_name
+        if constraint_names is not None:
+            valid_name = all([
+                name in ["meteor", "intent", "bleu"] for name in constraint_names])
+            assert valid_name, "Invalid constraint name"
+        self._constraint_names = constraint_names
         self.component_rewards = dict(intent_reward=0.0, meteor_reward=0.0)
+        if self._bleu is not None:
+            self.component_rewards["bleu_reward"] = 0.0
 
     def __call__(
         self,
@@ -656,6 +663,7 @@ class IntentAccuracy(BatchedRewardFunction):
 
         # compute rewards for finished episodes only
         rewards = np.zeros(len(gen_texts))
+        bleu_rewards = np.zeros(len(gen_texts))
 
         done_prompt_texts = []
         done_gen_texts = []
@@ -678,6 +686,12 @@ class IntentAccuracy(BatchedRewardFunction):
                     )
                     rewards[ix] = score["lexical/meteor"][1] # self._auto_coeff * score["lexical/meteor"][1]
 
+                if self._bleu is not None:
+                    bleu_score = self._bleu.compute(
+                        None, done_gen_texts, done_ref_texts
+                    )["lexical/bleu"][1]
+                    bleu_rewards[ix] += self._bleu_coeff * bleu_score
+
         scores = self._metric.compute(
             done_prompt_texts, done_gen_texts, done_ref_texts, done_meta_infos
         )["intent/accuracy"][0]
@@ -686,16 +700,25 @@ class IntentAccuracy(BatchedRewardFunction):
         rewards[done_ixs] += self._intent_coeff * np.array(scores)
         intent_rewards = np.zeros_like(rewards)
         intent_rewards[done_ixs] = np.array(scores)  * self._intent_coeff
-        # meteor_coeff = 1 if self._auto_coeff == 0 else 1 / self._auto_coeff    
         self.component_rewards = dict(
-            meteor_reward=meteor_rewards, intent_reward=intent_rewards) #  * meteor_coeff
-        if self._constraint_name is not None:
-            if self._constraint_name == "meteor":
-                self.constraint_rewards = meteor_rewards.tolist()
-                # dict(meteor=meteor_rewards, intent=intent_rewards)
-                return intent_rewards.tolist()
-            self.constraint_rewards = intent_rewards.tolist()
-            return meteor_rewards.tolist()
+            meteor_reward=meteor_rewards, intent_reward=intent_rewards)
+        if self._bleu is not None:
+            rewards += bleu_rewards
+            self.component_rewards["bleu_reward"] = bleu_rewards
+        if self._constraint_names is not None:
+            if self._bleu is None:
+                constraint_name = self._constraint_names[0]
+                if constraint_name == "meteor":
+                    self.constraint_rewards = [meteor_rewards.tolist()]
+                    return intent_rewards.tolist()
+                self.constraint_rewards = [intent_rewards.tolist()]
+                return meteor_rewards.tolist()
+            else:
+                self.constraint_rewards = [
+                    self.component_rewards[r].tolist() for r in self._constraint_names]
+                # the remaining reward is the task reward
+                task_r = [r for r in self.component_rewards.keys() if r not in self._constraint_names][0]
+                return self.component_rewards[task_r].tolist()
         return rewards.tolist()
 
 
