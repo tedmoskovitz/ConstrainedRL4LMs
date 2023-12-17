@@ -101,32 +101,34 @@ class ConstrainedRolloutBuffer(BaseBuffer):
         gae_lambda: float = 1,
         gamma: float = 0.99,
         n_envs: int = 1,
+        n_constraints: int = 1,
     ):
         super().__init__(buffer_size, observation_space, action_space, device, n_envs=n_envs)
         self.gae_lambda = gae_lambda
         self.gamma = gamma
         self.generator_ready = False
+        self.n_constraints = n_constraints
         self.reset()
 
     def reset(self) -> None:
         self.observations = np.zeros((self.buffer_size, self.n_envs, *self.obs_shape), dtype=np.float32)
         self.actions = np.zeros((self.buffer_size, self.n_envs, self.action_dim), dtype=np.float32)
         self.task_rewards = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
-        self.constraint_rewards = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
+        self.constraint_rewards = np.zeros((self.buffer_size, self.n_envs, self.n_constraints), dtype=np.float32)
         self.kl_rewards = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
         self.task_returns = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
-        self.constraint_returns = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
+        self.constraint_returns = np.zeros((self.buffer_size, self.n_envs, self.n_constraints), dtype=np.float32)
         self.kl_returns = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
         self.ep_task_reward_togo = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
-        self.ep_constraint_reward_togo = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
+        self.ep_constraint_reward_togo = np.zeros((self.buffer_size, self.n_envs, self.n_constraints), dtype=np.float32)
         self.ep_kl_reward_togo = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
         self.episode_starts = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
         self.task_values = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
-        self.constraint_values = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
+        self.constraint_values = np.zeros((self.buffer_size, self.n_envs, self.n_constraints), dtype=np.float32)
         self.kl_values = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
         self.log_probs = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
         self.task_advantages = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
-        self.constraint_advantages = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
+        self.constraint_advantages = np.zeros((self.buffer_size, self.n_envs, self.n_constraints), dtype=np.float32)
         self.kl_advantages = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
         self.generator_ready = False
         super().reset()
@@ -160,11 +162,11 @@ class ConstrainedRolloutBuffer(BaseBuffer):
         """
         # Convert to numpy; all shape [1,]
         last_task_values = last_task_values.clone().cpu().numpy().flatten()
-        last_constraint_values = last_constraint_values.clone().cpu().numpy().flatten()
+        last_constraint_values = last_constraint_values.clone().cpu().numpy()
         last_kl_values = last_kl_values.clone().cpu().numpy().flatten()
-        last_ep_task_reward_togo = last_ep_task_reward_togo  # .flatten()
-        last_ep_constraint_reward_togo = last_ep_constraint_reward_togo  # .flatten()
-        last_ep_kl_reward_togo = last_ep_kl_reward_togo  # .flatten()
+        last_ep_task_reward_togo = last_ep_task_reward_togo
+        last_ep_constraint_reward_togo = last_ep_constraint_reward_togo
+        last_ep_kl_reward_togo = last_ep_kl_reward_togo
 
         last_task_gae_lam, last_constraint_gae_lam, last_kl_gae_lam = 0, 0, 0
         for step in reversed(range(self.buffer_size)):
@@ -252,7 +254,7 @@ class ConstrainedRolloutBuffer(BaseBuffer):
         self.kl_rewards[self.pos] = np.array(kl_reward).copy()
         self.episode_starts[self.pos] = np.array(episode_start).copy()
         self.task_values[self.pos] = task_value.clone().cpu().numpy().flatten()
-        self.constraint_values[self.pos] = constraint_value.clone().cpu().numpy().flatten()
+        self.constraint_values[self.pos] = constraint_value.clone().cpu().numpy()
         self.kl_values[self.pos] = kl_value.clone().cpu().numpy().flatten()
         self.log_probs[self.pos] = log_prob.clone().cpu().numpy()
         self.pos += 1
@@ -304,17 +306,17 @@ class ConstrainedRolloutBuffer(BaseBuffer):
             self.observations[batch_inds],
             self.actions[batch_inds],
             self.task_values[batch_inds].flatten(),
-            self.constraint_values[batch_inds].flatten(),
+            self.constraint_values[batch_inds], # .flatten(),
             self.kl_values[batch_inds].flatten(),
             self.log_probs[batch_inds].flatten(),
             self.task_advantages[batch_inds].flatten(),
-            self.constraint_advantages[batch_inds].flatten(),
+            self.constraint_advantages[batch_inds], #.flatten(),
             self.kl_advantages[batch_inds].flatten(),
             self.task_returns[batch_inds].flatten(),
-            self.constraint_returns[batch_inds].flatten(),
+            self.constraint_returns[batch_inds], #.flatten(),
             self.kl_returns[batch_inds].flatten(),
             self.ep_task_reward_togo[batch_inds].flatten(),
-            self.ep_constraint_reward_togo[batch_inds].flatten(),
+            self.ep_constraint_reward_togo[batch_inds], #.flatten(),
             self.ep_kl_reward_togo[batch_inds].flatten(),
         )
         return ConstrainedRolloutBufferSamples(*tuple(map(self.to_torch, data)))
@@ -355,8 +357,9 @@ class ConstrainedDictRolloutBuffer(ConstrainedRolloutBuffer):
         gae_lambda: float = 1,
         gamma: float = 0.99,
         n_envs: int = 1,
+        n_constraints: int = 1, 
     ):
-        super(ConstrainedRolloutBuffer, self).__init__(buffer_size, observation_space, action_space, device, n_envs=n_envs)
+        super(ConstrainedRolloutBuffer, self).__init__(buffer_size, observation_space, action_space, device, n_envs=n_envs)  #, n_constraints=n_constraints
 
         assert isinstance(self.obs_shape, dict), "DictRolloutBuffer must be used with Dict obs space only"
 
@@ -364,6 +367,7 @@ class ConstrainedDictRolloutBuffer(ConstrainedRolloutBuffer):
         self.gamma = gamma
 
         self.generator_ready = False
+        self.n_constraints = n_constraints
         self.reset()
 
     def reset(self) -> None:
@@ -373,21 +377,21 @@ class ConstrainedDictRolloutBuffer(ConstrainedRolloutBuffer):
             self.observations[key] = np.zeros((self.buffer_size, self.n_envs, *obs_input_shape), dtype=np.float32)
         self.actions = np.zeros((self.buffer_size, self.n_envs, self.action_dim), dtype=np.float32)
         self.task_rewards = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
-        self.constraint_rewards = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
+        self.constraint_rewards = np.zeros((self.buffer_size, self.n_envs, self.n_constraints), dtype=np.float32)
         self.kl_rewards = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
         self.task_returns = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
-        self.constraint_returns = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
+        self.constraint_returns = np.zeros((self.buffer_size, self.n_envs, self.n_constraints), dtype=np.float32)
         self.kl_returns = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
         self.ep_task_reward_togo = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
-        self.ep_constraint_reward_togo = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
+        self.ep_constraint_reward_togo = np.zeros((self.buffer_size, self.n_envs, self.n_constraints), dtype=np.float32)
         self.ep_kl_reward_togo = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
         self.episode_starts = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
         self.task_values = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
-        self.constraint_values = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
+        self.constraint_values = np.zeros((self.buffer_size, self.n_envs, self.n_constraints), dtype=np.float32)
         self.kl_values = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
         self.log_probs = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
         self.task_advantages = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
-        self.constraint_advantages = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
+        self.constraint_advantages = np.zeros((self.buffer_size, self.n_envs, self.n_constraints), dtype=np.float32)
         self.kl_advantages = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
         self.generator_ready = False
         super(ConstrainedRolloutBuffer, self).reset()
@@ -429,14 +433,13 @@ class ConstrainedDictRolloutBuffer(ConstrainedRolloutBuffer):
 
         # Reshape to handle multi-dim and discrete action spaces, see GH #970 #1392
         action = action.reshape((self.n_envs, self.action_dim))
-
         self.actions[self.pos] = np.array(action).copy()
         self.task_rewards[self.pos] = np.array(task_reward).copy()
         self.constraint_rewards[self.pos] = np.array(constraint_reward).copy()
         self.kl_rewards[self.pos] = np.array(kl_reward).copy()
         self.episode_starts[self.pos] = np.array(episode_start).copy()
         self.task_values[self.pos] = task_value.clone().cpu().numpy().flatten()
-        self.constraint_values[self.pos] = constraint_value.clone().cpu().numpy().flatten()
+        self.constraint_values[self.pos] = constraint_value.clone().cpu().numpy() # .flatten()
         self.kl_values[self.pos] = kl_value.clone().cpu().numpy().flatten()
         self.log_probs[self.pos] = log_prob.clone().cpu().numpy()
         self.pos += 1
@@ -492,16 +495,16 @@ class ConstrainedDictRolloutBuffer(ConstrainedRolloutBuffer):
             observations={key: self.to_torch(obs[batch_inds]) for (key, obs) in self.observations.items()},
             actions=self.to_torch(self.actions[batch_inds]),
             old_task_values=self.to_torch(self.task_values[batch_inds].flatten()),
-            old_constraint_values=self.to_torch(self.constraint_values[batch_inds].flatten()),
+            old_constraint_values=self.to_torch(self.constraint_values[batch_inds]),  # .flatten()
             old_kl_values=self.to_torch(self.kl_values[batch_inds].flatten()),
             old_log_prob=self.to_torch(self.log_probs[batch_inds].flatten()),
             task_advantages=self.to_torch(self.task_advantages[batch_inds].flatten()),
-            constraint_advantages=self.to_torch(self.constraint_advantages[batch_inds].flatten()),
+            constraint_advantages=self.to_torch(self.constraint_advantages[batch_inds]),  # .flatten()
             kl_advantages=self.to_torch(self.kl_advantages[batch_inds].flatten()),
             task_returns=self.to_torch(self.task_returns[batch_inds].flatten()),
-            constraint_returns=self.to_torch(self.constraint_returns[batch_inds].flatten()),
+            constraint_returns=self.to_torch(self.constraint_returns[batch_inds]),  # .flatten()
             kl_returns=self.to_torch(self.kl_returns[batch_inds].flatten()),
             ep_task_reward_togo=self.to_torch(self.ep_task_reward_togo[batch_inds].flatten()),
-            ep_constraint_reward_togo=self.to_torch(self.ep_constraint_reward_togo[batch_inds].flatten()),
+            ep_constraint_reward_togo=self.to_torch(self.ep_constraint_reward_togo[batch_inds]),  # .flatten()
             ep_kl_reward_togo=self.to_torch(self.ep_kl_reward_togo[batch_inds].flatten()),
         )

@@ -651,11 +651,11 @@ class IntentAccuracy(BatchedRewardFunction):
 
     def __call__(
         self,
-        prompt_texts: List[str],
-        gen_texts: List[str],
-        ref_texts: List[List[str]],
-        dones: List[bool],
-        meta_infos: List[Dict[str, Any]] = None,
+        prompt_texts: List[str],  # length N
+        gen_texts: List[str],   # length N
+        ref_texts: List[List[str]],  # length N
+        dones: List[bool],  # length N
+        meta_infos: List[Dict[str, Any]] = None,  # length N
     ) -> List[float]:
 
         if self._metric is None:
@@ -714,11 +714,12 @@ class IntentAccuracy(BatchedRewardFunction):
                 self.constraint_rewards = [intent_rewards.tolist()]
                 return meteor_rewards.tolist()
             else:
-                self.constraint_rewards = [
-                    self.component_rewards[r].tolist() for r in self._constraint_names]
+                # makes an [n_constraints, N] array
+                self.constraint_rewards = np.array([
+                    self.component_rewards[r + "_reward"].tolist() for r in self._constraint_names])
                 # the remaining reward is the task reward
-                task_r = [r for r in self.component_rewards.keys() if r not in self._constraint_names][0]
-                return self.component_rewards[task_r].tolist()
+                # task_r = [r for r in self.component_rewards.keys() if r not in self._constraint_names][0]
+                return rewards.tolist() # self.component_rewards[task_r].tolist()
         return rewards.tolist()
 
 

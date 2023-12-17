@@ -10,7 +10,7 @@ reward_fn:
     intent_coeff: 1.0
     auto_coeff: 1.0
     bleu_coeff: 1.0
-    constraint_names: ["intent", "meteor",]
+    constraint_names: ["intent", "meteor", "bleu"]
 
 
 datapool:
@@ -34,12 +34,12 @@ alg:
     verbose: 1
     learning_rate: 0.000001
     n_epochs: 5
-    squash_lagrange: True
+    squash_lagrange: True  #False
     lagrange_lr: 0.1
-    fixed_lagrange: False
-    # ========================== mu/xi-PPO - KL ========================== 
-    # we'll current consider "task" == METEOR, "constraint" == Intent
-    constraint_thresholds: [0.44, 0.238]  # intent, meteor
+    fixed_lagrange: False #True
+    # ========================== mu-PPO - KL ========================== 
+    # constraint thresholds == intent threshold
+    constraint_thresholds: [0.44, 0.238, 0.002]  # intent, meteor, bleu
     vf_coef: 0.5
     constraint_vf_coef: 0.5
     kl_vf_coef: 0.2
@@ -47,7 +47,7 @@ alg:
 
     
   kl_div:
-    coeff: 0.2
+    coeff: 0.2 #0.1  # 0.2  # initial coeff
     # target_kl: 0.5  # to use a fixed coefficient, set to None; target is really
     # more like an upper-bound; if kl is below target, then decrease coeff, else
     # increase it (it's essentially like a Lagrange multiplier)
@@ -58,7 +58,7 @@ alg:
     args:
       model_name: gpt2
       apply_model_parallel: True
-      num_value_heads: 3
+      num_value_heads: 4
       debug_mode: False
       generation_kwargs:
         do_sample: True

@@ -132,14 +132,9 @@ class ConstrainedTextGenEnv(Env):
                     self.__current_obs.meta_info,
                 )
             )
-            # task_reward = self.reward_function.component_rewards[self.task_name]
-            # constraint_reward = self.reward_function.component_rewards[self.constraint_name]
             constraint_reward = self.reward_function.constraint_rewards
         else:
-            # reward = -inf  # will be overridden later
-            # task_reward = -inf  # will be overridden later
-            # constraint_reward = -inf  # will be overridden later
-            task_reward, constraint_reward = -inf, -inf  # will be overridden later
+            task_reward, constraint_reward = -inf, [-inf] * len(self.reward_function._constraint_names)  # will be overridden later
 
         # populate additional info
         info = {
@@ -149,7 +144,6 @@ class ConstrainedTextGenEnv(Env):
             "prompt_text": self.__current_obs.prompt_or_input_text,
             "prev_output": previous_obs.context_text,
             "meta_info": previous_obs.meta_info,
-            # "task_reward": task_reward,
             "constraint_reward": constraint_reward,
         }
         

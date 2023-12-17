@@ -225,14 +225,9 @@ class OnPolicyTrainer(TrainerWarmStartMixin):
             # inner rollout and learn loop for on-policy algorithm
             self._alg.learn(self._n_steps_per_iter)
 
-            # save the policy checkpoint
-            # if (epoch + 1) % self._train_eval_config.get("save_every", 20) == 0:
-            #     self.save_trainer_state(
-            #         self._tracker, self._alg.policy, self._trainer_state)
-
             # evaluate on val set in the given intervals
             if (epoch + 1) % self._train_eval_config["eval_every"] == 0:
-                self._evaluate_on_datapools(epoch=epoch)  #, splits=["val"])  # TODO: change back
+                self._evaluate_on_datapools(epoch=epoch)
 
         # finally evaluate on val and test samples
         self._evaluate_on_datapools(epoch=epoch)
@@ -295,6 +290,7 @@ class NelderMeadTrainer(TrainerWarmStartMixin):
         self._tokenizer_config = tokenizer_config
         self._datapool_config = datapool_config
         self._reward_config = reward_config
+        self._constraint_names = reward_config['args']['constraint_names']
         self._env_config = env_config
         self._on_policy_alg_config = on_policy_alg_config
         self._train_eval_config = train_eval_config
@@ -303,7 +299,7 @@ class NelderMeadTrainer(TrainerWarmStartMixin):
         self._experiment_name = experiment_name
         self._seed = seed
         self._disable_multiprocess = disable_multiprocess
-        self._num_evaluations = 0
+        self._num_evaluations = self._num_reached = 0
         self._setup()
 
     def _setup(self):
@@ -341,7 +337,6 @@ class NelderMeadTrainer(TrainerWarmStartMixin):
 
     def _evaluate_on_datapools(self,
                                epoch: int,
-                               increment_counter: bool = True,
                                splits: List[str] = ["val", "test"]):
         split2metrics = {}
         for split in splits:
@@ -357,13 +352,11 @@ class NelderMeadTrainer(TrainerWarmStartMixin):
                                 gen_kwargs=self._eval_gen_kwargs)
             split2metrics[split] = metrics
 
-        self._tracker.log_metrics(
-            epoch, "test", {"num_evaluations": self._num_evaluations})
-
         out = {
             "eval_score": split2metrics['test']["lexical/CRLHFEval_Score"],
             "meteor": split2metrics['test']["lexical/meteor"],
             "intent": split2metrics['test']["intent/accuracy"],
+            "bleu": split2metrics['test']["lexical/bleu"]
         }
 
         return out
@@ -371,10 +364,8 @@ class NelderMeadTrainer(TrainerWarmStartMixin):
     def evaluate_thresholds(self, thresholds: np.ndarray) -> float:
         # train for given number of iters
         iter_start = self._trainer_state["current_iter"]
-        task_threshold, constraint_threshold = thresholds
         reached = lambda x, thresh: x >= 0.95 * thresh and x <= 1.05 * thresh
-        self._alg.task_threshold = task_threshold
-        self._alg.constraint_threshold = constraint_threshold
+        self._alg.set_constraint_thresholds(thresholds)
         for epoch in range(iter_start, iter_start + self._n_iters // 10):
             # current state
             self._trainer_state["current_iter"] = epoch
@@ -384,13 +375,15 @@ class NelderMeadTrainer(TrainerWarmStartMixin):
 
             # evaluate on val set in the given intervals
             if (epoch + 1) % self._train_eval_config["eval_every"] == 0:
-                scores = self._evaluate_on_datapools(
-                    epoch=epoch, increment_counter=False)
+                scores = self._evaluate_on_datapools(epoch=epoch,)
+                self._num_evaluations += 1
+                self._tracker.log_metrics(
+                    epoch, "NelderMead", {"num_evaluations": self._num_evaluations})
                 
-                if reached(scores['meteor'], task_threshold) and reached(scores['intent'], constraint_threshold):
-                    self._num_evaluations += 1
+                if all([reached(scores[rm], thresholds[rm_idx]) for rm_idx, rm in enumerate(self._constraint_names)]):
+                    self._num_reached += 1
                     self._tracker.log_metrics(
-                        epoch, "NelderMead", {"num_evaluations": self._num_evaluations})
+                        epoch, "NelderMead", {"num_reached": self._num_reached})
                     self._trainer_state["current_iter"] = epoch
                     return -scores['eval_score']
                 
@@ -414,15 +407,23 @@ class NelderMeadTrainer(TrainerWarmStartMixin):
         # initialize simplex - 3 pairs of task and constraint thresholds
         _METEOR_MIN, _METEOR_MAX = 0.00037604571643093187, 0.24810026760745868
         _INTENT_MIN, _INTENT_MAX = 0.2504002561639449, 0.5283381364073007
-        _METEOR_INIT, _INTENT_INIT = 0.20125282801246643, 0.43036920138549805
+        _BLEU_MIN, _BLEU_MAX = 0.0, 0.005000230165777381
+        _METEOR_INIT, _INTENT_INIT, _BLEU_INIT = 0.20125282801246643, 0.43036920138549805, 0.002921999139009
         _METEOR_RANGE = _METEOR_MAX - _METEOR_INIT
         _INTENT_RANGE = _INTENT_MAX - _INTENT_INIT
+        _BLEU_RANGE = _BLEU_MAX - _BLEU_INIT
+        #TODO: hacky set-up, should fix
         simplex = np.array([
             [_METEOR_INIT + _METEOR_RANGE * np.random.uniform(),
              _INTENT_INIT + _INTENT_RANGE * np.random.uniform()] for _ in range(3)])
+        if len(self._constraint_names) == 3:  # [4, 3]
+            simplex = np.array([
+            [_METEOR_INIT + _METEOR_RANGE * np.random.uniform(),
+             _INTENT_INIT + _INTENT_RANGE * np.random.uniform(),
+             _BLEU_INIT + _BLEU_RANGE * np.random.uniform()] for _ in range(4)])
         
 
-        num_vars = simplex.shape[1]  # Number of variables (2 in this case)
+        num_vars = simplex.shape[1]  # Number of variables
         iterates = []
 
         func = NelderMeadFunc(self.evaluate_thresholds)
@@ -449,9 +450,7 @@ class NelderMeadTrainer(TrainerWarmStartMixin):
             
             if best_val <= func(reflected) < func(simplex[-2]):
                 simplex[-1] = reflected
-                
                 continue
-                
 
             # Expand
             if func(reflected) < func(simplex[0]):

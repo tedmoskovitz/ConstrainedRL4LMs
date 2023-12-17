@@ -139,17 +139,17 @@ class MaskableConstrainedRolloutBuffer(ConstrainedRolloutBuffer):
             self.observations[batch_inds],
             self.actions[batch_inds],
             self.task_values[batch_inds].flatten(),
-            self.constraint_values[batch_inds].flatten(),
+            self.constraint_values[batch_inds], #.flatten(),
             self.kl_values[batch_inds].flatten(),
             self.log_probs[batch_inds].flatten(),
             self.task_advantages[batch_inds].flatten(),
-            self.constraint_advantages[batch_inds].flatten(),
+            self.constraint_advantages[batch_inds], #.flatten(),
             self.kl_advantages[batch_inds].flatten(),
             self.task_returns[batch_inds].flatten(),
-            self.constraint_returns[batch_inds].flatten(),
+            self.constraint_returns[batch_inds], #.flatten(),
             self.kl_returns[batch_inds].flatten(),
             self.ep_task_reward_togo[batch_inds].flatten(),
-            self.ep_constraint_reward_togo[batch_inds].flatten(),
+            self.ep_constraint_reward_togo[batch_inds], #.flatten(),
             self.ep_kl_reward_togo[batch_inds].flatten(),
             self.action_masks[batch_inds].reshape(-1, self.mask_dims),
         )
@@ -269,17 +269,17 @@ class MaskableConstrainedDictRolloutBuffer(ConstrainedDictRolloutBuffer):
                 key, obs) in self.observations.items()},
             actions=self.to_torch(self.actions[batch_inds]),
             old_task_values=self.to_torch(self.task_values[batch_inds].flatten()),
-            old_constraint_values=self.to_torch(self.constraint_values[batch_inds].flatten()),
+            old_constraint_values=self.to_torch(self.constraint_values[batch_inds]), # .flatten()
             old_kl_values=self.to_torch(self.kl_values[batch_inds].flatten()),
             old_log_prob=self.to_torch(self.log_probs[batch_inds].flatten()),
             task_advantages=self.to_torch(self.task_advantages[batch_inds].flatten()),
-            constraint_advantages=self.to_torch(self.constraint_advantages[batch_inds].flatten()),
+            constraint_advantages=self.to_torch(self.constraint_advantages[batch_inds]), #.flatten()
             kl_advantages=self.to_torch(self.kl_advantages[batch_inds].flatten()),
             task_returns=self.to_torch(self.task_returns[batch_inds].flatten()),
-            constraint_returns=self.to_torch(self.constraint_returns[batch_inds].flatten()),
+            constraint_returns=self.to_torch(self.constraint_returns[batch_inds]), #.flatten()
             kl_returns=self.to_torch(self.kl_returns[batch_inds].flatten()),
             ep_task_reward_togo=self.to_torch(self.ep_task_reward_togo[batch_inds].flatten()),
-            ep_constraint_reward_togo=self.to_torch(self.ep_constraint_reward_togo[batch_inds].flatten()),
+            ep_constraint_reward_togo=self.to_torch(self.ep_constraint_reward_togo[batch_inds]), #.flatten()
             ep_kl_reward_togo=self.to_torch(self.ep_kl_reward_togo[batch_inds].flatten()),
             action_masks=self.to_torch(
                 self.action_masks[batch_inds].reshape(-1, self.mask_dims)),
@@ -320,10 +320,12 @@ class MaskableConstrainedDictRolloutBuffer(ConstrainedDictRolloutBuffer):
         gae_lambda: float = 1,
         gamma: float = 0.99,
         n_envs: int = 1,
+        n_constraints: int = 1,
     ):
         self.action_masks = None
         super().__init__(buffer_size, observation_space,
-                         action_space, device, gae_lambda, gamma, n_envs=n_envs)
+                         action_space, device, gae_lambda, gamma,
+                         n_envs=n_envs, n_constraints=n_constraints)
 
     def reset(self) -> None:
         if isinstance(self.action_space, spaces.Discrete):
@@ -398,17 +400,17 @@ class MaskableConstrainedDictRolloutBuffer(ConstrainedDictRolloutBuffer):
                 key, obs) in self.observations.items()},
             actions=self.to_torch(self.actions[batch_inds]),
             old_task_values=self.to_torch(self.task_values[batch_inds].flatten()),
-            old_constraint_values=self.to_torch(self.constraint_values[batch_inds].flatten()),
+            old_constraint_values=self.to_torch(self.constraint_values[batch_inds]), #.flatten()
             old_kl_values=self.to_torch(self.kl_values[batch_inds].flatten()),
             old_log_prob=self.to_torch(self.log_probs[batch_inds].flatten()),
             task_advantages=self.to_torch(self.task_advantages[batch_inds].flatten()),
-            constraint_advantages=self.to_torch(self.constraint_advantages[batch_inds].flatten()),
+            constraint_advantages=self.to_torch(self.constraint_advantages[batch_inds]), #.flatten()
             kl_advantages=self.to_torch(self.kl_advantages[batch_inds].flatten()),
             task_returns=self.to_torch(self.task_returns[batch_inds].flatten()),
-            constraint_returns=self.to_torch(self.constraint_returns[batch_inds].flatten()),
+            constraint_returns=self.to_torch(self.constraint_returns[batch_inds]), #.flatten()
             kl_returns=self.to_torch(self.kl_returns[batch_inds].flatten()),
             ep_task_reward_togo=self.to_torch(self.ep_task_reward_togo[batch_inds].flatten()),
-            ep_constraint_reward_togo=self.to_torch(self.ep_constraint_reward_togo[batch_inds].flatten()),
+            ep_constraint_reward_togo=self.to_torch(self.ep_constraint_reward_togo[batch_inds]), #.flatten()
             ep_kl_reward_togo=self.to_torch(self.ep_kl_reward_togo[batch_inds].flatten()),
             action_masks=self.to_torch(
                 self.action_masks[batch_inds].reshape(-1, self.mask_dims)),
