@@ -3,7 +3,7 @@ This codebase contains the implementation of constrained RLHF.
 
 Currently, the code is a bit hacky, supporting only composite reward models formed from the combination of METEOR and intent matching rewards, but we plan to provide a more general implementation soon. 
 
-The codebase is a fork of the excellent RL4LMs repository: https://github.com/allenai/RL4LMs. 
+The codebase is structured on the excellent RL4LMs repository: https://github.com/allenai/RL4LMs. 
 
 Constrained approaches can be run via the command:
 ```
